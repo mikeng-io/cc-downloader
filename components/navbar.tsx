@@ -50,7 +50,6 @@ export function Navbar() {
                 </span>
                 <form
                   action={async () => {
-                    "use server";
                     await fetch("/api/auth/signout", { method: "POST" });
                     window.location.href = "/";
                   }}
