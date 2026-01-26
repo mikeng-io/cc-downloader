@@ -29,40 +29,16 @@ export async function createDownloadSpan(
   operation: string,
   fn: () => Promise<void>
 ) {
-  const { trace } = await import("@opentelemetry/api");
-  const tracer = trace.getTracer("cc-downloader");
+  // In development without proper OpenTelemetry SDK, just run the function
+  if (process.env.NODE_ENV === "development") {
+    return fn();
+  }
 
-  return tracer.startActiveSpan(`download.${operation}`, async (span) => {
-    try {
-      await fn();
-      span.set_status({ code: 1 });
-    } catch (error) {
-      span.recordException(error as Error);
-      span.setStatus({ code: 2, message: (error as Error).message });
-      throw error;
-    } finally {
-      span.end();
-    }
-  }, {
-    attributes: {
-      "download.id": downloadId,
-      "download.operation": operation,
-    },
-  });
-}
+  try {
+    const { trace } = await import("@opentelemetry/api");
+    const tracer = trace.getTracer("cc-downloader");
 
-// Create a span for API operations
-export async function createApiSpan(
-  method: string,
-  path: string,
-  fn: () => Promise<void>
-) {
-  const { trace } = await import("@opentelemetry/api");
-  const tracer = trace.getTracer("api");
-
-  return tracer.startActiveSpan(
-    `${method} ${path}`,
-    async (span) => {
+    return tracer.startActiveSpan(`download.${operation}`, async (span: any) => {
       try {
         await fn();
         span.set_status({ code: 1 });
@@ -73,15 +49,59 @@ export async function createApiSpan(
       } finally {
         span.end();
       }
-    },
-    {
-      kind: "span",
+    }, {
       attributes: {
-        "http.method": method,
-        "http.route": path,
+        "download.id": downloadId,
+        "download.operation": operation,
       },
-    }
-  );
+    });
+  } catch {
+    // If OpenTelemetry fails, just run the function
+    return fn();
+  }
+}
+
+// Create a span for API operations
+export async function createApiSpan(
+  method: string,
+  path: string,
+  fn: () => Promise<void>
+) {
+  // In development without proper OpenTelemetry SDK, just run the function
+  if (process.env.NODE_ENV === "development") {
+    return fn();
+  }
+
+  try {
+    const { trace } = await import("@opentelemetry/api");
+    const tracer = trace.getTracer("api");
+
+    return tracer.startActiveSpan(
+      `${method} ${path}`,
+      async (span: any) => {
+        try {
+          await fn();
+          span.set_status({ code: 1 });
+        } catch (error) {
+          span.recordException(error as Error);
+          span.setStatus({ code: 2, message: (error as Error).message });
+          throw error;
+        } finally {
+          span.end();
+        }
+      },
+      {
+        kind: "span",
+        attributes: {
+          "http.method": method,
+          "http.route": path,
+        },
+      }
+    );
+  } catch {
+    // If OpenTelemetry fails, just run the function
+    return fn();
+  }
 }
 
 // Metrics for performance monitoring
