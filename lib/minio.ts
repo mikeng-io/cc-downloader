@@ -1,4 +1,4 @@
-import { Client, ClientOptions } from "@minio/sdk";
+import { Client, ClientOptions } from "minio";
 import { createReadStream, statSync } from "fs";
 import { Readable } from "stream";
 import * as http from "http";
