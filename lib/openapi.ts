@@ -1,4 +1,4 @@
-import { createDocument } from "@scalar/zod-to-openapi";
+import { createDocument } from "zod-to-openapi";
 import type { OpenAPIDocument } from "openapi-types";
 
 // Zod schemas for API documentation
