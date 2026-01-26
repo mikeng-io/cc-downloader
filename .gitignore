@@ -52,3 +52,6 @@ next-env.d.ts
 
 # OpenSpec (if not needed in repo)
 openspec/
+
+# Prisma
+prisma/migrations/*/migration.sql
