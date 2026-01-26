@@ -11,6 +11,57 @@ export interface DownloadJobData {
   userId: string;
   url: string;
   downloadType: "DIRECT" | "YTDLP" | "GALLERY_DL";
+  retryCount?: number; // Track retry attempts
+}
+
+// Retryable error types
+const RETRYABLE_ERROR_PATTERNS = [
+  /timeout/i,
+  /timed out/i,
+  /etimedout/i,
+  /econnrefused/i,
+  /econnreset/i,
+  /enotfound/i,
+  /temporary/i,
+  /temporarily unavailable/i,
+  /503/i,
+  /502/i,
+  /504/i,
+  /connection/i,
+  /network/i,
+];
+
+/**
+ * Check if an error is retryable
+ */
+function isRetryableError(error: Error | string): boolean {
+  const errorMessage = error instanceof Error ? error.message : String(error);
+  return RETRYABLE_ERROR_PATTERNS.some(pattern => pattern.test(errorMessage));
+}
+
+/**
+ * Classify error for retry logic
+ */
+export function classifyError(error: Error | string): {
+  retryable: boolean;
+  type: string;
+  message: string;
+} {
+  const errorMessage = error instanceof Error ? error.message : String(error);
+
+  if (isRetryableError(errorMessage)) {
+    return {
+      retryable: true,
+      type: "TEMPORARY",
+      message: errorMessage,
+    };
+  }
+
+  return {
+    retryable: false,
+    type: "PERMANENT",
+    message: errorMessage,
+  };
 }
 
 export const downloadQueue = new Queue<DownloadJobData>("downloads", {
@@ -31,12 +82,12 @@ export const downloadQueue = new Queue<DownloadJobData>("downloads", {
   },
 });
 
-// Worker configuration
+// Worker configuration with retry tracking
 export function createWorker() {
   const worker = new Worker<DownloadJobData>(
     "downloads",
     async (job: Job<DownloadJobData>) => {
-      const { downloadId, url, downloadType } = job.data;
+      const { downloadId, url, downloadType, retryCount = 0 } = job.data;
 
       // Update status to PROCESSING
       await prisma.download.update({
@@ -44,6 +95,7 @@ export function createWorker() {
         data: {
           status: DownloadStatus.PROCESSING,
           startedAt: new Date(),
+          retryCount: retryCount > 0 ? retryCount : null,
         },
       });
 
@@ -63,15 +115,36 @@ export function createWorker() {
             throw new Error(`Unknown download type: ${downloadType}`);
         }
       } catch (error) {
-        // Mark as failed
-        await prisma.download.update({
-          where: { id: downloadId },
-          data: {
-            status: DownloadStatus.FAILED,
-            errorMessage: error instanceof Error ? error.message : String(error),
-            completedAt: new Date(),
-          },
-        });
+        // Classify error
+        const classification = classifyError(error instanceof Error ? error : new Error(String(error)));
+
+        // If this is the last attempt or error is not retryable, mark as permanently failed
+        const currentAttempt = job.attemptsMade;
+        const maxAttempts = job.opts.attempts || 3;
+
+        if (!classification.retryable || currentAttempt >= maxAttempts) {
+          // Mark as permanently failed
+          await prisma.download.update({
+            where: { id: downloadId },
+            data: {
+              status: DownloadStatus.FAILED,
+              errorMessage: classification.message,
+              errorType: classification.type,
+              completedAt: new Date(),
+              retryCount: currentAttempt,
+            },
+          });
+        } else {
+          // Will be retried - mark with retryable error
+          await prisma.download.update({
+            where: { id: downloadId },
+            data: {
+              errorMessage: `Retry ${currentAttempt + 1}/${maxAttempts}: ${classification.message}`,
+              retryCount: currentAttempt,
+            },
+          });
+        }
+
         throw error;
       }
     },
@@ -86,7 +159,24 @@ export function createWorker() {
   });
 
   worker.on("failed", (job, err) => {
-    console.error(`Job ${job?.id} failed:`, err);
+    const currentAttempt = job?.attemptsMade || 0;
+    const maxAttempts = job?.opts.attempts || 3;
+    console.error(`Job ${job?.id} failed (attempt ${currentAttempt}/${maxAttempts}):`, err);
+
+    // Check if we should retry
+    if (job && currentAttempt < maxAttempts) {
+      const errorClassification = classifyError(err);
+      if (errorClassification.retryable) {
+        console.log(`Job ${job.id} will be retried with exponential backoff`);
+        // Update job data with retry count
+        job.updateData({
+          ...job.data,
+          retryCount: currentAttempt + 1,
+        });
+      } else {
+        console.log(`Job ${job.id} has non-retryable error: ${errorClassification.type}`);
+      }
+    }
   });
 
   return worker;

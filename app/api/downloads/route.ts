@@ -8,13 +8,13 @@ import { DownloadStatus, MimeType } from "@prisma/client";
 import { createApiSpan } from "@/lib/otel";
 
 export async function POST(request: NextRequest) {
-  return createApiSpan("POST", "/api/downloads", async () => {
-    // Check authentication
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  // Check authentication first (outside telemetry wrapper)
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
+  return createApiSpan("POST", "/api/downloads", async () => {
     try {
       const body = await request.json();
 
@@ -90,13 +90,13 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
-  return createApiSpan("GET", "/api/downloads", async () => {
-    // Check authentication
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  // Check authentication first (outside telemetry wrapper)
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
+  return createApiSpan("GET", "/api/downloads", async () => {
     try {
       const { searchParams } = new URL(request.url);
 

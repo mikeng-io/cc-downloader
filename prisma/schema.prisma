@@ -134,6 +134,7 @@ model Download {
 
   // Error handling
   errorMessage  String?       @db.Text
+  errorType     String?       // "TEMPORARY" or "PERMANENT"
   retryCount    Int           @default(0)
   maxRetries    Int           @default(3)
 
