@@ -1,10 +1,12 @@
 import { promisify } from "util";
 import { execFile } from "child_process";
 import { prisma } from "@/lib/prisma";
-import { ensureBucket, generateStorageKey, uploadFile, getPresignedUrl } from "@/lib/minio";
+import { ensureBucket, generateStorageKey, uploadFileStream, getPresignedUrl } from "@/lib/minio";
 import { DownloadStatus, MimeType, DownloadType } from "@prisma/client";
 import type { Job } from "bullmq";
 import type { DownloadJobData } from "@/lib/queue";
+import { mkdir, rm, stat, readdir } from "fs/promises";
+import { join } from "path";
 
 const execFileAsync = promisify(execFile);
 
@@ -40,6 +42,10 @@ export async function handleYtdlpDownload(job: Job<DownloadJobData>) {
   const { downloadId, userId, url } = job.data;
   const updateProgress = job.updateProgress;
 
+  // Create temp directory for this download
+  const tempDir = `/tmp/cc-downloader/${downloadId}`;
+  await mkdir(tempDir, { recursive: true });
+
   try {
     // Step 1: Get video info first
     updateProgress?.(10);
@@ -52,32 +58,46 @@ export async function handleYtdlpDownload(job: Job<DownloadJobData>) {
       );
     }
 
-    // Step 2: Download to temporary file
+    // Step 2: Download to temporary file using streaming
     updateProgress?.(20);
-    const { buffer, filename } = await downloadWithYtdlp(url, downloadId, (progress) => {
+    const { filename, filePath } = await downloadWithYtdlp(url, tempDir, (progress) => {
       updateProgress?.(20 + Math.floor(progress * 60)); // 20-80% for download
     });
 
-    // Step 3: Upload to MinIO
+    // Step 3: Upload to MinIO using streaming (memory efficient)
     updateProgress?.(85);
     await ensureBucket();
 
     const storageKey = generateStorageKey(userId, downloadId, filename);
-    await uploadFile(storageKey, buffer, {
-      "Content-Type": getMimeTypeFromExt(info.ext || "mp4"),
-      "downloaded-from": url,
-    });
+    const mimeType = getMimeTypeFromExt(info.ext || "mp4");
+
+    // Get file size for database
+    const fileStats = await stat(filePath);
+
+    // Stream upload to MinIO (no buffering in memory)
+    await uploadFileStream(
+      storageKey,
+      filePath,
+      {
+        "Content-Type": mimeType,
+        "downloaded-from": url,
+      },
+      (bytesUploaded, totalBytes) => {
+        // Track upload progress: 85-95%
+        const uploadProgress = (bytesUploaded / totalBytes) * 10; // 0-10%
+        updateProgress?.(85 + Math.floor(uploadProgress));
+      }
+    );
 
     // Step 4: Update database
     updateProgress?.(95);
-    const mimeType = getMimeTypeFromExt(info.ext || "mp4");
 
     await prisma.download.update({
       where: { id: downloadId },
       data: {
         status: DownloadStatus.COMPLETED,
         fileName: filename,
-        fileSize: BigInt(buffer.length),
+        fileSize: BigInt(fileStats.size),
         mimeType,
         storagePath: storageKey,
         title: info.title,
@@ -103,7 +123,17 @@ export async function handleYtdlpDownload(job: Job<DownloadJobData>) {
     });
 
     updateProgress?.(100);
+
+    // Step 5: Cleanup temp file
+    await rm(tempDir, { recursive: true, force: true });
   } catch (error) {
+    // Cleanup temp file on error
+    try {
+      await rm(tempDir, { recursive: true, force: true });
+    } catch {
+      // Ignore cleanup errors
+    }
+
     // Mark as failed
     await prisma.download.update({
       where: { id: downloadId },
@@ -136,49 +166,58 @@ async function getYtdlpInfo(url: string): Promise<YtdlpInfo> {
 
 async function downloadWithYtdlp(
   url: string,
-  downloadId: string,
+  tempDir: string,
   onProgress?: (progress: number) => void
-): Promise<{ buffer: Buffer; filename: string }> {
-  const tempDir = `/tmp/cc-downloader/${downloadId}`;
-  const outputFile = `${tempDir}/download.%(ext)s`;
+): Promise<{ filename: string; filePath: string }> {
+  const outputFile = join(tempDir, "download.%(ext)s");
 
   // Use execFile with proper argument array (NEVER exec)
   const args = [
     "-f", "best", // Best quality
     "-o", outputFile,
     "--no-playlist",
-    "--print", "filename:%(filename)s", // Print filename
+    "--newline", // Output progress on new lines for easier parsing
+    "--no-warnings", // Reduce noise in output
     url,
   ];
 
   return new Promise((resolve, reject) => {
     const process = execFile(YTDLP_PATH, args, {
       timeout: YTDLP_TIMEOUT,
-      maxBuffer: 10 * 1024 * 1024,
+      maxBuffer: 10 * 1024 * 1024, // 10MB buffer for status output only
     });
 
     let filename = "download.mp4";
+    let lastProgress = 0;
+
+    const parseProgress = (data: string) => {
+      // Parse filename from yt-dlp output
+      const filenameMatch = data.match(/\[download\] Destination: (.+)/);
+      if (filenameMatch?.[1]) {
+        filename = filenameMatch[1].split("/").pop() || filename;
+      }
+
+      // Parse download progress (more robust regex)
+      const progressMatch = data.match(/\[download\]\s+(\d+\.?\d*)%/);
+      if (progressMatch?.[1]) {
+        const progress = parseFloat(progressMatch[1]) / 100;
+        // Only update if progress has increased significantly (reduces database writes)
+        if (progress - lastProgress > 0.01) {
+          lastProgress = progress;
+          onProgress?.(progress);
+        }
+      }
+    };
 
     process.stdout?.on("data", (data: Buffer) => {
-      const output = data.toString();
-      // Parse filename from yt-dlp output
-      const match = output.match(/filename:(.+)/);
-      if (match?.[1]) {
-        filename = match[1].trim();
-      }
-      // Parse download progress
-      const progressMatch = output.match(/\[download\]\s+(\d+\.?\d*)%/);
-      if (progressMatch?.[1]) {
-        onProgress?.(parseFloat(progressMatch[1]) / 100);
-      }
+      parseProgress(data.toString());
     });
 
     process.stderr?.on("data", (data: Buffer) => {
       const output = data.toString();
-      // Parse download progress from stderr
-      const progressMatch = output.match(/\[download\]\s+(\d+\.?\d*)%/);
-      if (progressMatch?.[1]) {
-        onProgress?.(parseFloat(progressMatch[1]) / 100);
+      // Only parse progress from stderr, ignore warnings
+      if (!output.includes("WARNING")) {
+        parseProgress(output);
       }
     });
 
@@ -189,25 +228,23 @@ async function downloadWithYtdlp(
       }
 
       try {
-        // Read the downloaded file
-        const fs = await import("fs/promises");
-        const path = await import("path");
-
-        // Find the downloaded file
-        const files = await fs.readdir(tempDir);
+        // Find the downloaded file in temp directory
+        const files = await readdir(tempDir);
         const downloadedFile = files.find(f => f.startsWith("download."));
 
         if (!downloadedFile) {
           throw new Error("Downloaded file not found");
         }
 
-        const filePath = path.join(tempDir, downloadedFile);
-        const buffer = await fs.readFile(filePath);
+        const filePath = join(tempDir, downloadedFile);
 
-        // Cleanup
-        await fs.rm(tempDir, { recursive: true, force: true });
+        // Verify file exists and has content
+        const fileStats = await stat(filePath);
+        if (fileStats.size === 0) {
+          throw new Error("Downloaded file is empty");
+        }
 
-        resolve({ buffer, filename: downloadedFile });
+        resolve({ filename: downloadedFile, filePath });
       } catch (error) {
         reject(error);
       }

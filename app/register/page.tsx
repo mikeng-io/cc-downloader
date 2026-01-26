@@ -2,8 +2,11 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import Link from "next/link";
 import { register } from "@/lib/auth";
+import { RateLimits, checkRateLimit } from "@/lib/rate-limit";
+import { headers } from "next/headers";
 
-export default async function RegisterPage() {
+export default async function RegisterPage(props: { searchParams: Promise<{ error?: string }> }) {
+  const searchParams = await props.searchParams;
   const session = await auth();
 
   if (session) {
@@ -18,6 +21,17 @@ export default async function RegisterPage() {
           const email = formData.get("email") as string;
           const password = formData.get("password") as string;
           const confirmPassword = formData.get("confirmPassword") as string;
+
+          // Rate limiting check
+          const headersList = headers();
+          const ip = headersList.get("x-forwarded-for")?.split(",")[0] || "unknown";
+
+          const rateLimitResult = await checkRateLimit(`register:${ip}:${email}`, RateLimits.register);
+
+          if (!rateLimitResult.success) {
+            const retryMinutes = Math.ceil((rateLimitResult.retryAfter || 0) / 60000);
+            redirect(`/register?error=${encodeURIComponent(`Too many registration attempts. Try again in ${retryMinutes} minutes.`)}`);
+          }
 
           // Validation
           if (!email || !password || !confirmPassword) {
@@ -50,6 +64,13 @@ export default async function RegisterPage() {
           <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
             Start downloading media with CC-Downloader
           </p>
+          {searchParams.error && (
+            <div className="mt-4 rounded-md bg-red-50 p-3 dark:bg-red-900/20">
+              <p className="text-sm text-red-800 dark:text-red-200">
+                {searchParams.error}
+              </p>
+            </div>
+          )}
         </div>
         <div className="space-y-6">
           <div>

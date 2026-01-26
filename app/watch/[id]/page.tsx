@@ -24,12 +24,11 @@ export default async function WatchPage({ params }: WatchPageProps) {
       id: true,
       userId: true,
       title: true,
-      url: true,
+      sourceUrl: true,
       status: true,
-      filePath: true,
-      fileFormat: true,
+      storagePath: true,
+      mimeType: true,
       fileSize: true,
-      thumbnailPath: true,
       createdAt: true,
     },
   });
@@ -44,25 +43,16 @@ export default async function WatchPage({ params }: WatchPageProps) {
     redirect("/downloads");
   }
 
-  // Get presigned URL from MinIO for streaming
+  // Get presigned URL from MinIO for streaming (1 hour for security)
   let videoUrl = "";
-  let thumbnailUrl = "";
 
   try {
-    // Presigned URL valid for 24 hours (86400 seconds)
+    // Presigned URL valid for 1 hour (3600 seconds) - reduced from 24h for security
     videoUrl = await minioClient.presignedGetObject(
       "downloads",
-      download.filePath,
-      86400
+      download.storagePath,
+      3600
     );
-
-    if (download.thumbnailPath) {
-      thumbnailUrl = await minioClient.presignedGetObject(
-        "downloads",
-        download.thumbnailPath,
-        86400
-      );
-    }
   } catch (error) {
     console.error("Failed to generate presigned URL:", error);
     redirect("/downloads");
@@ -116,12 +106,12 @@ export default async function WatchPage({ params }: WatchPageProps) {
               </p>
               <p className="mt-1 text-sm text-gray-900 dark:text-white">
                 <a
-                  href={download.url}
+                  href={download.sourceUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="truncate text-blue-600 hover:underline dark:text-blue-400"
                 >
-                  {download.url}
+                  {download.sourceUrl}
                 </a>
               </p>
             </div>
@@ -131,7 +121,7 @@ export default async function WatchPage({ params }: WatchPageProps) {
                 File Size
               </p>
               <p className="mt-1 text-sm text-gray-900 dark:text-white">
-                {formatFileSize(download.fileSize)}
+                {download.fileSize ? formatFileSize(download.fileSize) : "Unknown"}
               </p>
             </div>
 
@@ -140,7 +130,7 @@ export default async function WatchPage({ params }: WatchPageProps) {
                 Format
               </p>
               <p className="mt-1 text-sm text-gray-900 dark:text-white">
-                {download.fileFormat?.toUpperCase() || "Unknown"}
+                {download.mimeType?.replace("VIDEO_", "").replace("AUDIO_", "").toLowerCase() || "Unknown"}
               </p>
             </div>
 

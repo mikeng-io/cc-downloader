@@ -1,24 +1,47 @@
 import { signIn } from "@/lib/auth";
 import { auth } from "@/lib/auth";
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { RateLimits, checkRateLimit } from "@/lib/rate-limit";
+import { headers } from "next/headers";
 
-export default async function LoginPage() {
+export default async function LoginPage(props: { searchParams: Promise<{ registered?: string; error?: string }> }) {
   const session = await auth();
+  const searchParams = await props.searchParams;
 
   if (session) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-950">
-        <p className="text-gray-900 dark:text-white">Already logged in. Redirecting...</p>
-      </div>
-    );
+    redirect("/downloads");
   }
+
+  // Handle registration success message
+  const showRegisteredMessage = searchParams.registered === "true";
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 dark:bg-gray-950">
       <form
         action={async (formData) => {
           "use server";
-          await signIn("credentials", formData);
+          const email = formData.get("email") as string;
+          const password = formData.get("password") as string;
+
+          // Rate limiting check
+          const headersList = headers();
+          const ip = headersList.get("x-forwarded-for")?.split(",")[0] || "unknown";
+
+          const rateLimitResult = await checkRateLimit(`login:${ip}:${email}`, RateLimits.auth);
+
+          if (!rateLimitResult.success) {
+            const retryMinutes = Math.ceil((rateLimitResult.retryAfter || 0) / 60000);
+            redirect(`/login?error=${encodeURIComponent(`Too many attempts. Try again in ${retryMinutes} minutes.`)}`);
+          }
+
+          // Attempt sign in
+          try {
+            await signIn("credentials", { email, password });
+          } catch (error) {
+            // Sign in will redirect on success, or throw on failure
+            redirect(`/login?error=${encodeURIComponent("Invalid email or password")}`);
+          }
         }}
         className="w-full max-w-md space-y-8 rounded-lg bg-white p-8 shadow-lg dark:bg-gray-800"
       >
@@ -29,6 +52,20 @@ export default async function LoginPage() {
           <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
             Enter your credentials to access your downloads
           </p>
+          {showRegisteredMessage && (
+            <div className="mt-4 rounded-md bg-green-50 p-3 dark:bg-green-900/20">
+              <p className="text-sm text-green-800 dark:text-green-200">
+                Registration successful! Please sign in with your credentials.
+              </p>
+            </div>
+          )}
+          {searchParams.error && (
+            <div className="mt-4 rounded-md bg-red-50 p-3 dark:bg-red-900/20">
+              <p className="text-sm text-red-800 dark:text-red-200">
+                {searchParams.error}
+              </p>
+            </div>
+          )}
         </div>
         <div className="space-y-6">
           <div>
