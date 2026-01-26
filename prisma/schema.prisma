@@ -22,6 +22,11 @@ model User {
   image         String?
   password      String?   // Hashed password for credentials auth
 
+  // Account lockout fields for security
+  failedLoginAttempts  Int       @default(0)
+  lockedUntil          DateTime?
+  lastFailedLogin      DateTime?
+
   accounts      Account[]
   sessions      Session[]
   downloads     Download[]

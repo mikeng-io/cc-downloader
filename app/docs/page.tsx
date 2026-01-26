@@ -18,10 +18,10 @@ export default function ApiDocsPage() {
 
   if (!Scalar) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-950">
         <div className="text-center">
           <div className="mb-4 h-12 w-12 animate-spin rounded-full border-4 border-blue-600 border-t-transparent mx-auto" />
-          <p className="text-gray-600">Loading API documentation...</p>
+          <p className="text-gray-600 dark:text-gray-400">Loading API documentation...</p>
         </div>
       </div>
     );

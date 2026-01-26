@@ -46,10 +46,12 @@ export default function DownloadsPage() {
   }, [filter, search]);
 
   return (
-    <main className="min-h-screen p-8">
+    <main className="min-h-screen bg-gray-50 p-8 dark:bg-gray-950">
       <div className="mx-auto max-w-6xl">
         <div className="mb-8 text-center">
-          <h1 className="text-4xl font-bold">My Downloads</h1>
+          <h1 className="text-4xl font-bold text-gray-900 dark:text-white">
+            My Downloads
+          </h1>
           <p className="mt-2 text-lg text-gray-600 dark:text-gray-400">
             Manage your downloaded media
           </p>
@@ -65,7 +67,7 @@ export default function DownloadsPage() {
             <select
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
-              className="rounded-md border px-3 py-2 text-sm"
+              className="rounded-md border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white"
             >
               <option value="all">All</option>
               <option value="PENDING">Pending</option>
@@ -79,7 +81,7 @@ export default function DownloadsPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by filename..."
-              className="rounded-md border px-3 py-2 text-sm"
+              className="w-64 rounded-md border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500"
             />
           </div>
 
@@ -89,7 +91,7 @@ export default function DownloadsPage() {
               className={`rounded-md px-3 py-2 text-sm ${
                 view === "list"
                   ? "bg-blue-600 text-white"
-                  : "bg-gray-200 dark:bg-gray-700"
+                  : "bg-gray-200 text-gray-900 dark:bg-gray-700 dark:text-white"
               }`}
             >
               List
@@ -99,7 +101,7 @@ export default function DownloadsPage() {
               className={`rounded-md px-3 py-2 text-sm ${
                 view === "grid"
                   ? "bg-blue-600 text-white"
-                  : "bg-gray-200 dark:bg-gray-700"
+                  : "bg-gray-200 text-gray-900 dark:bg-gray-700 dark:text-white"
               }`}
             >
               Grid
@@ -109,9 +111,9 @@ export default function DownloadsPage() {
 
         {/* Downloads */}
         {loading ? (
-          <p className="text-center text-gray-500">Loading...</p>
+          <p className="text-center text-gray-500 dark:text-gray-400">Loading...</p>
         ) : downloads.length === 0 ? (
-          <p className="text-center text-gray-500">
+          <p className="text-center text-gray-500 dark:text-gray-400">
             No downloads yet. Submit a URL above to get started.
           </p>
         ) : view === "list" ? (

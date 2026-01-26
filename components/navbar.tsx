@@ -1,8 +1,26 @@
-import Link from "next/link";
-import { auth, signOut } from "@/lib/auth";
+"use client";
 
-export async function Navbar() {
-  const session = await auth();
+import Link from "next/link";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { auth, signOut } from "@/lib/auth";
+import { useEffect, useState } from "react";
+
+export function Navbar() {
+  const [session, setSession] = useState<any>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    // Fetch session on mount
+    fetch("/api/auth/session")
+      .then(res => res.json())
+      .then(data => setSession(data))
+      .catch(() => setSession(null));
+  }, []);
+
+  if (!mounted) {
+    return null; // Avoid hydration mismatch
+  }
 
   return (
     <nav className="border-b bg-white dark:bg-gray-900">
@@ -23,7 +41,8 @@ export async function Navbar() {
               </div>
             )}
           </div>
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
             {session?.user ? (
               <>
                 <span className="hidden text-sm text-gray-600 dark:text-gray-400 sm:block">
@@ -32,7 +51,8 @@ export async function Navbar() {
                 <form
                   action={async () => {
                     "use server";
-                    await signOut();
+                    await fetch("/api/auth/signout", { method: "POST" });
+                    window.location.href = "/";
                   }}
                 >
                   <button
@@ -44,12 +64,20 @@ export async function Navbar() {
                 </form>
               </>
             ) : (
-              <Link
-                href="/login"
-                className="rounded-md px-3 py-2 text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800"
-              >
-                Sign in
-              </Link>
+              <div className="flex items-center gap-2">
+                <Link
+                  href="/login"
+                  className="rounded-md px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+                >
+                  Sign in
+                </Link>
+                <Link
+                  href="/register"
+                  className="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+                >
+                  Register
+                </Link>
+              </div>
             )}
           </div>
         </div>
