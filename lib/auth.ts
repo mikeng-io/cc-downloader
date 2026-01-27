@@ -2,6 +2,7 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { compare, hash } from "bcryptjs";
 import { prisma } from "./prisma";
+import { isAllowedEmailDomain } from "./email";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
@@ -24,6 +25,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           // Still do dummy comparison to prevent timing attacks
           await compare(credentials.password as string, "$2a$12$dummy.hash.for.timing.attack.protection");
           return null;
+        }
+
+        // Check if email is verified
+        if (!user.emailVerified) {
+          throw new Error("Please verify your email address before signing in.");
         }
 
         // Check if account is locked
@@ -222,6 +228,11 @@ export async function register(email: string, password: string) {
       return { error: "Invalid email address" };
     }
 
+    // Check if email domain is allowed
+    if (!isAllowedEmailDomain(email)) {
+      return { error: "Registration is restricted to authorized email domains only" };
+    }
+
     // Check password strength
     const passwordValidation = validatePasswordStrength(password);
     if (!passwordValidation.valid) {
@@ -240,13 +251,13 @@ export async function register(email: string, password: string) {
     // Hash password with bcrypt (12 rounds for security)
     const hashedPassword = await hash(password, 12);
 
-    // Create user with hashed password
+    // Create user with hashed password (email not yet verified)
     const user = await prisma.user.create({
       data: {
         email,
         password: hashedPassword,
         name: email.split("@")[0], // Use email prefix as name
-        emailVerified: new Date(),
+        emailVerified: null, // Requires email verification
       },
     });
 

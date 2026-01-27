@@ -2,7 +2,7 @@ import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { LoginForm } from "@/components/login-form";
 
-export default async function LoginPage(props: { searchParams: Promise<{ registered?: string; error?: string }> }) {
+export default async function LoginPage(props: { searchParams: Promise<{ registered?: string; verified?: string; error?: string }> }) {
   const session = await auth();
   const searchParams = await props.searchParams;
 
@@ -10,5 +10,10 @@ export default async function LoginPage(props: { searchParams: Promise<{ registe
     redirect("/downloads");
   }
 
-  return <LoginForm registered={searchParams.registered === "true"} />;
+  return (
+    <LoginForm
+      registered={searchParams.registered === "true"}
+      verified={searchParams.verified === "true"}
+    />
+  );
 }
