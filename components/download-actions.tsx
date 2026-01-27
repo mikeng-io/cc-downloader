@@ -7,11 +7,11 @@ import { Button } from "actify";
 interface DownloadActionsProps {
   downloadId: string;
   status: string;
-  storagePath: string | null;
   onDeleted?: () => void;
+  onPreview?: () => void;
 }
 
-export function DownloadActions({ downloadId, status, storagePath, onDeleted }: DownloadActionsProps) {
+export function DownloadActions({ downloadId, status, onDeleted, onPreview }: DownloadActionsProps) {
   const router = useRouter();
   const [isDeleting, setIsDeleting] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
@@ -50,21 +50,14 @@ export function DownloadActions({ downloadId, status, storagePath, onDeleted }: 
     }
   };
 
-  const handleDownload = async () => {
-    // TODO: Generate presigned URL from MinIO and trigger download
-    console.log("Download file:", storagePath);
-  };
-
   return (
     <div className="flex items-center gap-2">
       {/* View button - primary action for completed media */}
-      {status === "COMPLETED" && (
+      {status === "COMPLETED" && onPreview && (
         <Button
           variant="filled"
           className="flex items-center gap-1"
-          onPress={() => {
-            window.location.href = `/view/${downloadId}`;
-          }}
+          onPress={onPreview}
         >
           <span className="material-symbols-outlined text-xl">visibility</span>
           View

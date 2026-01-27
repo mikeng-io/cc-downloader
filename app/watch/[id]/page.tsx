@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { VideoPlayer } from "@/components/video-player";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { formatFileSize } from "@/lib/utils/format-file-size";
 
 interface WatchPageProps {
   params: Promise<{ id: string }>;
@@ -45,20 +46,6 @@ export default async function WatchPage({ params }: WatchPageProps) {
   // Use streaming API endpoint instead of direct MinIO presigned URL
   // This works in both local and container environments
   const videoUrl = `/api/downloads/${download.id}/content`;
-
-  // Format file size for display
-  const formatFileSize = (bytes: number) => {
-    const units = ["B", "KB", "MB", "GB"];
-    let size = bytes;
-    let unitIndex = 0;
-
-    while (size >= 1024 && unitIndex < units.length - 1) {
-      size /= 1024;
-      unitIndex++;
-    }
-
-    return `${size.toFixed(2)} ${units[unitIndex]}`;
-  };
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -108,7 +95,7 @@ export default async function WatchPage({ params }: WatchPageProps) {
                 File Size
               </p>
               <p className="mt-1 text-sm text-gray-900 dark:text-white">
-                {download.fileSize ? formatFileSize(Number(download.fileSize)) : "Unknown"}
+                {formatFileSize(download.fileSize ? Number(download.fileSize) : null)}
               </p>
             </div>
 

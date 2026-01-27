@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Card } from "actify";
 import { motion } from "framer-motion";
+import { formatFileSize } from "@/lib/utils/format-file-size";
 
 interface MetadataPanelProps {
   download: {
@@ -31,14 +32,6 @@ interface MetadataPanelProps {
  */
 export function MetadataPanel({ download, className = "" }: MetadataPanelProps) {
   const [copiedField, setCopiedField] = useState<string | null>(null);
-
-  const formatFileSize = (bytes: number | null): string => {
-    if (!bytes) return "Unknown";
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(2)} KB`;
-    if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
-    return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
-  };
 
   const formatDate = (dateString: string): string => {
     try {

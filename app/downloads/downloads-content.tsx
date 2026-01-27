@@ -2,11 +2,9 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { DownloadCard } from "@/components/download-card";
-import { UrlSubmitForm } from "@/components/url-submit-form";
 import { Pagination } from "@/components/pagination";
-import { TextField, Select, Button } from "actify";
-import { motion } from "framer-motion";
+import { ImagePreviewModal } from "@/components/image-preview-modal";
+import { formatFileSize } from "@/lib/utils/format-file-size";
 
 interface Download {
   id: string;
@@ -14,6 +12,7 @@ interface Download {
   downloadType: string;
   status: string;
   fileName: string | null;
+  fileSize?: number | null;
   createdAt: string;
 }
 
@@ -27,24 +26,22 @@ interface DownloadsResponse {
   };
 }
 
-const DEFAULT_LIMIT = 12;
+const DEFAULT_LIMIT = 20;
 
 export function DownloadsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const pathname = usePathname();
 
-  // Get current filter values from URL
   const currentPage = parseInt(searchParams.get("page") ?? "1", 10);
   const currentFilter = searchParams.get("status") ?? "all";
   const currentSearch = searchParams.get("search") ?? "";
 
   const [downloads, setDownloads] = useState<Download[]>([]);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState<"list" | "grid">("list");
   const [pagination, setPagination] = useState<DownloadsResponse["pagination"] | null>(null);
+  const [previewDownload, setPreviewDownload] = useState<Download | null>(null);
 
-  // Update URL params without navigation
   const updateUrlParams = useCallback(
     (params: Record<string, string | null>) => {
       const newParams = new URLSearchParams(searchParams.toString());
@@ -57,7 +54,6 @@ export function DownloadsContent() {
         }
       });
 
-      // Reset to page 1 when filter/search changes
       if (params.status !== undefined || params.search !== undefined) {
         newParams.set("page", "1");
       }
@@ -90,151 +86,234 @@ export function DownloadsContent() {
 
   useEffect(() => {
     fetchDownloads();
-    // Poll every 5 seconds
     const interval = setInterval(fetchDownloads, 5000);
     return () => clearInterval(interval);
   }, [fetchDownloads]);
 
-  // Handle filter changes
   const handleFilterChange = (value: string) => {
     updateUrlParams({ status: value === "all" ? null : value });
   };
 
-  // Handle search changes
   const handleSearchChange = (value: string) => {
     updateUrlParams({ search: value || null });
   };
 
+  const handleDelete = async (downloadId: string) => {
+    if (!confirm("Are you sure you want to delete this download?")) return;
+
+    try {
+      const response = await fetch(`/api/downloads/${downloadId}`, {
+        method: "DELETE",
+      });
+      if (response.ok) {
+        fetchDownloads();
+      }
+    } catch (error) {
+      console.error("Failed to delete:", error);
+    }
+  };
+
+  const handleRetry = async (downloadId: string) => {
+    try {
+      const response = await fetch(`/api/downloads/${downloadId}/retry`, {
+        method: "POST",
+      });
+      if (response.ok) {
+        fetchDownloads();
+      }
+    } catch (error) {
+      console.error("Failed to retry:", error);
+    }
+  };
+
   return (
-    <main className="min-h-screen bg-gray-50 dark:bg-gray-950">
-      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <main className="min-h-screen bg-surface p-4 sm:p-8">
+      <div className="mx-auto max-w-7xl space-y-6">
         {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-            My Downloads
-          </h1>
-          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-            Manage your downloaded media
+        <div>
+          <h1 className="text-3xl font-bold text-on-surface">My Downloads</h1>
+          <p className="mt-1 text-sm text-on-surface-variant">
+            View and manage your downloaded media files
           </p>
         </div>
 
-        {/* URL Submit Form */}
-        <div className="mb-6">
-          <UrlSubmitForm onSubmit={fetchDownloads} />
+        {/* Filters */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <select
+            value={currentFilter}
+            onChange={(e) => handleFilterChange(e.target.value)}
+            className="rounded-md border border-outline bg-surface px-3 py-2 text-sm text-on-surface focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
+          >
+            <option value="all">All Status</option>
+            <option value="PENDING">Pending</option>
+            <option value="PROCESSING">Processing</option>
+            <option value="COMPLETED">Completed</option>
+            <option value="FAILED">Failed</option>
+          </select>
+
+          <input
+            type="text"
+            value={currentSearch}
+            onChange={(e) => handleSearchChange(e.target.value)}
+            placeholder="Search by filename..."
+            className="rounded-md border border-outline bg-surface px-3 py-2 text-sm text-on-surface placeholder:text-on-surface-variant focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary sm:w-64"
+          />
         </div>
 
-        {/* Filters and View Toggle */}
-        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
-            <select
-              value={currentFilter}
-              onChange={(e) => handleFilterChange(e.target.value)}
-              className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-            >
-              <option value="all">All</option>
-              <option value="PENDING">Pending</option>
-              <option value="PROCESSING">Processing</option>
-              <option value="COMPLETED">Completed</option>
-              <option value="FAILED">Failed</option>
-            </select>
-
-            <TextField
-              type="text"
-              value={currentSearch}
-              onChange={(e) => handleSearchChange((e.target as HTMLInputElement).value)}
-              label="Search by filename..."
-              variant="outlined"
-              className="w-full sm:w-64"
-            />
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Button
-              variant={view === "list" ? "filled" : "outlined"}
-              onClick={() => setView("list")}
-              className="px-3 py-2"
-              aria-label="List view"
-            >
-              <span className="material-symbols-outlined text-xl">
-                view_list
-              </span>
-            </Button>
-            <Button
-              variant={view === "grid" ? "filled" : "outlined"}
-              onClick={() => setView("grid")}
-              className="px-3 py-2"
-              aria-label="Grid view"
-            >
-              <span className="material-symbols-outlined text-xl">
-                grid_view
-              </span>
-            </Button>
-          </div>
-        </div>
-
-        {/* Downloads */}
+        {/* Downloads Table */}
         {loading ? (
           <div className="flex min-h-[200px] items-center justify-center">
-            <p className="text-gray-500 dark:text-gray-400">Loading...</p>
+            <p className="text-on-surface-variant">Loading...</p>
           </div>
         ) : downloads.length === 0 ? (
-          <div className="flex min-h-[200px] items-center justify-center rounded-lg border border-dashed border-gray-300 bg-gray-50 dark:border-gray-700 dark:bg-gray-900">
-            <p className="text-center text-gray-500 dark:text-gray-400">
-              No downloads found. Try adjusting your filters or submit a new URL.
-            </p>
+          <div className="flex min-h-[200px] items-center justify-center rounded-lg border border-dashed border-outline bg-surface-container">
+            <div className="text-center">
+              <span className="material-symbols-outlined text-5xl text-on-surface-variant">
+                cloud_download
+              </span>
+              <p className="mt-4 text-on-surface-variant">
+                No downloads found. Try adjusting your filters or{" "}
+                <a href="/" className="text-primary hover:underline">
+                  submit a new URL
+                </a>
+                .
+              </p>
+            </div>
           </div>
         ) : (
           <>
-            <motion.div
-              layout
-              className={
-                view === "list"
-                  ? "grid gap-4"
-                  : "grid auto-rows-fr gap-4"
-              }
-              style={{
-                gridTemplateColumns: view === "grid"
-                  ? "repeat(auto-fill, minmax(280px, 1fr))"
-                  : undefined
-              }}
-            >
-              {downloads.map((download, index) => (
-                <motion.div
-                  key={download.id}
-                  layout
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  transition={{
-                    duration: 0.3,
-                    delay: index * 0.05,
-                  }}
-                >
-                  <DownloadCard
-                    downloadId={download.id}
-                    sourceUrl={download.sourceUrl}
-                    downloadType={download.downloadType}
-                    createdAt={download.createdAt}
-                    onDeleted={fetchDownloads}
-                  />
-                </motion.div>
-              ))}
-            </motion.div>
+            <div className="overflow-x-auto rounded-lg border border-outline-variant bg-surface-container">
+              <table className="w-full">
+                <thead className="border-b border-outline-variant bg-surface-container-high">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-on-surface-variant">
+                      File
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-on-surface-variant">
+                      Size
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-on-surface-variant">
+                      Status
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-on-surface-variant">
+                      Date
+                    </th>
+                    <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-on-surface-variant">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-outline-variant">
+                  {downloads.map((download) => (
+                    <tr
+                      key={download.id}
+                      className="transition-colors hover:bg-surface-container-high"
+                    >
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <span className="material-symbols-outlined text-on-surface-variant">
+                            {download.downloadType === "VIDEO" ? "videocam" : "image"}
+                          </span>
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium text-on-surface">
+                              {download.fileName || "Untitled"}
+                            </p>
+                            <p className="truncate text-xs text-on-surface-variant max-w-[300px]">
+                              {download.sourceUrl}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="text-sm text-on-surface">
+                          {download.fileSize ? formatFileSize(download.fileSize) : "—"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                            download.status === "COMPLETED"
+                              ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+                              : download.status === "PROCESSING"
+                              ? "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
+                              : download.status === "FAILED"
+                              ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
+                              : "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300"
+                          }`}
+                        >
+                          {download.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="text-sm text-on-surface">
+                          {new Date(download.createdAt).toLocaleDateString()}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-end gap-2">
+                          {download.status === "COMPLETED" && (
+                            <>
+                              <button
+                                onClick={() => setPreviewDownload(download)}
+                                className="rounded px-2 py-1 text-sm text-primary hover:bg-primary/10"
+                              >
+                                View
+                              </button>
+                              <a
+                                href={`/api/downloads/${download.id}/content`}
+                                download
+                                className="rounded px-2 py-1 text-sm text-primary hover:bg-primary/10"
+                              >
+                                Download
+                              </a>
+                            </>
+                          )}
+                          {download.status === "FAILED" && (
+                            <button
+                              onClick={() => handleRetry(download.id)}
+                              className="rounded px-2 py-1 text-sm text-primary hover:bg-primary/10"
+                            >
+                              Retry
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleDelete(download.id)}
+                            disabled={download.status === "PROCESSING"}
+                            className="rounded px-2 py-1 text-sm text-error hover:bg-error/10 disabled:opacity-50"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
-            {/* Pagination */}
             {pagination && pagination.totalPages > 1 && (
-              <div className="mt-8">
-                <Pagination
-                  currentPage={pagination.page}
-                  totalPages={pagination.totalPages}
-                  total={pagination.total}
-                  limit={pagination.limit}
-                />
-              </div>
+              <Pagination
+                currentPage={pagination.page}
+                totalPages={pagination.totalPages}
+                total={pagination.total}
+                limit={pagination.limit}
+              />
             )}
           </>
         )}
       </div>
+
+      {/* Image Preview Modal */}
+      {previewDownload && (
+        <ImagePreviewModal
+          isOpen={!!previewDownload}
+          onClose={() => setPreviewDownload(null)}
+          imageUrl={`/api/downloads/${previewDownload.id}/content`}
+          fileName={previewDownload.fileName || "Unknown"}
+          fileSize={previewDownload.fileSize}
+          downloadUrl={`/api/downloads/${previewDownload.id}/content`}
+        />
+      )}
     </main>
   );
 }

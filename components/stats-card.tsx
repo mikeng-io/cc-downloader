@@ -83,11 +83,11 @@ export function StatsCard({
               initial={{ opacity: 0.7, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.4 }}
-              className={`text-3xl font-bold ${colorClasses[color]}`}
+              className={`font-sans text-3xl font-bold ${colorClasses[color]}`}
             >
               {value.toLocaleString()}
             </motion.div>
-            <p className="text-sm text-gray-600 dark:text-gray-400">{label}</p>
+            <p className="font-sans text-sm text-gray-600 dark:text-gray-400">{label}</p>
           </div>
         </div>
       </Card>

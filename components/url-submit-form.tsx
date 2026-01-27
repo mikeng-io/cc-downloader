@@ -60,16 +60,18 @@ export function UrlSubmitForm({ onSubmit }: UrlSubmitFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="w-full">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
         <div className="flex-1 min-w-0">
           <TextField
             type="url"
             value={url}
-            onChange={(e) => setUrl((e.target as HTMLInputElement).value)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement> | string) => {
+              const value = typeof e === 'string' ? e : e?.target?.value ?? '';
+              setUrl(value);
+            }}
             label="Enter URL to download..."
             variant="outlined"
-            disabled={isSubmitting}
-            error={!!error}
+            isDisabled={isSubmitting}
             className="w-full"
           />
         </div>
@@ -82,23 +84,26 @@ export function UrlSubmitForm({ onSubmit }: UrlSubmitFormProps) {
             variant="filled"
             type="submit"
             isDisabled={isSubmitting || !url.trim()}
-            className="px-6 py-3 whitespace-nowrap"
+            className="h-[56px] px-6 whitespace-nowrap font-sans"
           >
             {success ? (
               <motion.span
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
-                className="material-symbols-outlined text-xl align-middle"
+                className="material-symbols-outlined text-xl"
+                style={{ verticalAlign: 'middle' }}
               >
                 check_circle
               </motion.span>
             ) : (
-              <>
-                <span className="material-symbols-outlined text-xl align-middle mr-1">
+              <span className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-xl">
                   {isSubmitting ? "sync" : "download"}
                 </span>
-                {isSubmitting ? "Submitting..." : "Download"}
-              </>
+                <span className="font-sans">
+                  {isSubmitting ? "Submitting..." : "Download"}
+                </span>
+              </span>
             )}
           </Button>
         </motion.div>
@@ -108,7 +113,7 @@ export function UrlSubmitForm({ onSubmit }: UrlSubmitFormProps) {
         <motion.p
           initial={{ opacity: 0, x: -10 }}
           animate={{ opacity: 1, x: 0 }}
-          className="mt-2 text-sm text-red-600 dark:text-red-400"
+          className="mt-2 text-sm text-red-600 dark:text-red-400 font-sans"
         >
           {error}
         </motion.p>

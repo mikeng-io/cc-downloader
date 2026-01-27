@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useDownloadProgress } from "@/lib/hooks/use-download-progress";
 import { ProgressBar } from "./progress-bar";
 import { DownloadActions } from "./download-actions";
 import { TypeIcon } from "./type-icon";
 import { CardSkeleton } from "./loading-skeleton";
+import { ImagePreviewModal } from "./image-preview-modal";
 import { Card } from "actify";
 import { motion, AnimatePresence } from "framer-motion";
+import { formatFileSize } from "@/lib/utils/format-file-size";
 
 interface DownloadCardProps {
   downloadId: string;
@@ -38,6 +40,7 @@ export function DownloadCard({
   const [prevStatus, setPrevStatus] = useState<string | null>(null);
   const [showFlash, setShowFlash] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
 
   // Detect status changes and trigger flash animation
   useEffect(() => {
@@ -166,9 +169,7 @@ export function DownloadCard({
                 {data.result.fileName}
               </p>
               <p className="text-xs text-gray-600 dark:text-gray-400">
-                {data.result.fileSize
-                  ? `${(data.result.fileSize / 1024 / 1024).toFixed(2)} MB`
-                  : "Unknown size"}
+                {formatFileSize(data.result.fileSize)}
               </p>
             </motion.div>
           )}
@@ -179,11 +180,23 @@ export function DownloadCard({
           <DownloadActions
             downloadId={downloadId}
             status={data.status}
-            storagePath={data.result?.storagePath || null}
             onDeleted={onDeleted}
+            onPreview={() => setShowPreview(true)}
           />
         </div>
       </Card>
+
+      {/* Image Preview Modal */}
+      {data.result && (
+        <ImagePreviewModal
+          isOpen={showPreview}
+          onClose={() => setShowPreview(false)}
+          imageUrl={`/api/downloads/${downloadId}/content`}
+          fileName={data.result.fileName}
+          fileSize={data.result.fileSize}
+          downloadUrl={`/api/downloads/${downloadId}/content`}
+        />
+      )}
     </motion.div>
   );
 }

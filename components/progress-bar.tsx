@@ -2,6 +2,7 @@
 
 import { DownloadProgress } from "@/lib/hooks/use-download-progress";
 import { motion } from "framer-motion";
+import { formatFileSize } from "@/lib/utils/format-file-size";
 
 interface ProgressBarProps {
   progress: DownloadProgress;
@@ -18,23 +19,17 @@ interface ProgressBarProps {
  * - Animated percentage counter
  */
 export function ProgressBar({ progress }: ProgressBarProps) {
-  const percentage = progress.progress?.percentage ?? 0;
+  // For completed downloads, show 100% even if progress data is missing
+  const isCompleted = progress.status === "COMPLETED";
+  const percentage = isCompleted ? 100 : (progress.progress?.percentage ?? 0);
   const bytesDownloaded = progress.progress?.bytesDownloaded ?? 0;
   const totalBytes = progress.progress?.totalBytes;
   const speed = progress.progress?.speed;
   const eta = progress.progress?.eta;
 
-  const formatBytes = (bytes: number): string => {
-    if (bytes === 0) return "0 B";
-    const k = 1024;
-    const sizes = ["B", "KB", "MB", "GB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
-  };
-
   const formatSpeed = (bytesPerSecond: number | null): string => {
     if (!bytesPerSecond) return "";
-    return `${formatBytes(bytesPerSecond)}/s`;
+    return `${formatFileSize(bytesPerSecond)}/s`;
   };
 
   const formatEta = (seconds: number | null | undefined): string => {
@@ -73,7 +68,7 @@ export function ProgressBar({ progress }: ProgressBarProps) {
         <div className="flex items-center gap-4 text-gray-600 dark:text-gray-400">
           {totalBytes && (
             <span>
-              {formatBytes(bytesDownloaded)} / {formatBytes(totalBytes)}
+              {formatFileSize(bytesDownloaded)} / {formatFileSize(totalBytes)}
             </span>
           )}
           {speed && <span>{formatSpeed(speed)}</span>}
