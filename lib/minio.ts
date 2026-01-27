@@ -87,32 +87,23 @@ export async function uploadFileStream(
 
   const fileStream = createReadStream(filePath);
 
-  return new Promise((resolve, reject) => {
-    // Track upload progress
-    let bytesUploaded = 0;
+  // Track upload progress
+  let bytesUploaded = 0;
 
-    fileStream.on("data", (chunk: Buffer | string) => {
-      bytesUploaded += Buffer.byteLength(String(chunk));
-      onProgress?.(bytesUploaded, fileSize);
-    });
-
-    fileStream.on("error", reject);
-
-    minioClient.putObject(
-      minioBucket,
-      storageKey,
-      fileStream,
-      fileSize,
-      metadata || {},
-      (err: Error | null, result?: any) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve({ etag: result?.etag || "", versionId: result?.versionId });
-        }
-      }
-    );
+  fileStream.on("data", (chunk: Buffer | string) => {
+    bytesUploaded += Buffer.byteLength(String(chunk));
+    onProgress?.(bytesUploaded, fileSize);
   });
+
+  const result = await minioClient.putObject(
+    minioBucket,
+    storageKey,
+    fileStream,
+    fileSize,
+    metadata || {}
+  );
+
+  return { etag: result?.etag || "", versionId: result?.versionId ?? undefined };
 }
 
 /**
@@ -124,22 +115,15 @@ export async function uploadReadableStream(
   size: number,
   metadata?: Record<string, string>
 ): Promise<{ etag: string; versionId?: string }> {
-  return new Promise((resolve, reject) => {
-    minioClient.putObject(
-      minioBucket,
-      storageKey,
-      stream,
-      size,
-      metadata || {},
-      (err: Error | null, result?: any) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve({ etag: result?.etag || "", versionId: result?.versionId });
-        }
-      }
-    );
-  });
+  const result = await minioClient.putObject(
+    minioBucket,
+    storageKey,
+    stream,
+    size,
+    metadata || {}
+  );
+
+  return { etag: result?.etag || "", versionId: result?.versionId ?? undefined };
 }
 
 // Generate presigned URL for download (reduced expiration for security)
