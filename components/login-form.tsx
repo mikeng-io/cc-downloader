@@ -1,36 +1,17 @@
 "use client";
 
-import { useState, useTransition } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { Button } from "actify";
 
 interface LoginFormProps {
   registered?: boolean;
+  verified?: boolean;
 }
 
-export function LoginForm({ registered }: LoginFormProps) {
+export function LoginForm({ registered, verified }: LoginFormProps) {
   const searchParams = useSearchParams();
-  const router = useRouter();
-  const [isPending, startTransition] = useTransition();
   const error = searchParams.get("error");
-
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-
-    startTransition(async () => {
-      const response = await fetch("/login/auth", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (response.redirected) {
-        router.push(response.url);
-      }
-    });
-  };
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12 dark:bg-gray-950">
@@ -40,7 +21,7 @@ export function LoginForm({ registered }: LoginFormProps) {
           {/* Header */}
           <div className="mb-8 text-center">
             <h2 className="text-3xl font-bold text-gray-900 dark:text-white">
-              Sign in to CC-Downloader
+              Sign in to Downloader
             </h2>
             <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
               Enter your credentials to access your downloads
@@ -48,7 +29,14 @@ export function LoginForm({ registered }: LoginFormProps) {
           </div>
 
           {/* Messages */}
-          {registered && (
+          {verified && (
+            <div className="mb-4 rounded-md bg-green-50 p-3 dark:bg-green-900/20">
+              <p className="text-sm text-green-800 dark:text-green-200">
+                Email verified successfully! You can now sign in.
+              </p>
+            </div>
+          )}
+          {registered && !verified && (
             <div className="mb-4 rounded-md bg-green-50 p-3 dark:bg-green-900/20">
               <p className="text-sm text-green-800 dark:text-green-200">
                 Registration successful! Please sign in with your credentials.
@@ -64,7 +52,7 @@ export function LoginForm({ registered }: LoginFormProps) {
           )}
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form action="/login/auth" method="POST" className="space-y-6">
             <div>
               <label htmlFor="email" className="mb-1 block text-sm font-medium text-gray-900 dark:text-white">
                 Email
@@ -74,7 +62,6 @@ export function LoginForm({ registered }: LoginFormProps) {
                 name="email"
                 type="email"
                 required
-                disabled={isPending}
                 className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
                 placeholder="you@example.com"
               />
@@ -88,7 +75,6 @@ export function LoginForm({ registered }: LoginFormProps) {
                 name="password"
                 type="password"
                 required
-                disabled={isPending}
                 className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
                 placeholder="••••••••"
               />
@@ -97,10 +83,9 @@ export function LoginForm({ registered }: LoginFormProps) {
             <Button
               variant="filled"
               type="submit"
-              isDisabled={isPending}
               className="w-full"
             >
-              {isPending ? "Signing in..." : "Sign in"}
+              Sign in
             </Button>
           </form>
 

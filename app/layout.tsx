@@ -4,7 +4,7 @@ import { Navbar } from "@/components/navbar";
 import { ThemeProvider } from "@/components/theme-provider";
 
 export const metadata: Metadata = {
-  title: "CC-Downloader",
+  title: "Downloader",
   description: "Self-hosted Progressive Web Application for downloading media content from any URL",
 };
 
@@ -16,7 +16,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" />
+        {/* Material Symbols font is now self-hosted via globals.css */}
       </head>
       <body className="antialiased">
         <ThemeProvider>

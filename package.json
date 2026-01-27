@@ -1,5 +1,5 @@
 {
-  "name": "cc-downloader",
+  "name": "downloader",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -49,6 +49,7 @@
     "prisma": "^6.1.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "resend": "^6.8.0",
     "serwist": "^9.5.0",
     "tailwind-merge": "^2.6.0",
     "typescript": "^5.7.2",

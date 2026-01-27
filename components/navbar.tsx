@@ -30,11 +30,11 @@ export function Navbar() {
         <div className="flex h-16 justify-between">
           <div className="flex items-center gap-8">
             <Link href="/" className="text-xl font-bold">
-              CC-Downloader
+              Downloader
             </Link>
             {session?.user && (
-              <div className="hidden md:flex items-center gap-6 text-sm">
-                <Link href="/downloads" className="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white">
+              <div className="flex items-center gap-6 text-sm">
+                <Link href="/downloads" className="font-sans text-gray-600 transition-colors hover:text-gray-900 dark:text-gray-400 dark:hover:text-white">
                   Downloads
                 </Link>
               </div>
@@ -80,12 +80,7 @@ export function Navbar() {
           </div>
         </div>
 
-        {/* Quota display row - only shown when logged in */}
-        {session?.user && (
-          <div className="py-3 border-t border-gray-100 dark:border-gray-800">
-            <StorageQuotaDisplay />
-          </div>
-        )}
+        {/* Storage quota moved to homepage - removed duplicate */}
       </div>
     </nav>
   );
