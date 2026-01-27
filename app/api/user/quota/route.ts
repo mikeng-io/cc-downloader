@@ -41,8 +41,8 @@ export async function GET(request: NextRequest) {
     const storageLimit = quota.storageLimit;
     const fileCount = quota.fileCount;
 
-    // Calculate percentage
-    const percentage = Number((totalStorage * BigInt(100)) / storageLimit);
+    // Calculate percentage using float division for precision
+    const percentage = (Number(totalStorage) / Number(storageLimit)) * 100;
     const remaining = storageLimit - totalStorage;
 
     // Format bytes to human-readable format
@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
       totalStorage: totalStorage.toString(),
       storageLimit: storageLimit.toString(),
       fileCount,
-      percentage: Math.round(percentage * 10) / 10, // Round to 1 decimal place
+      percentage: percentage < 1 ? Math.round(percentage * 100) / 100 : Math.round(percentage * 10) / 10,
       remaining: remaining.toString(),
       formatted: {
         used: formatBytes(totalStorage),
