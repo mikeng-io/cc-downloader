@@ -5,13 +5,17 @@ Self-hosted Progressive Web Application for downloading media content from any U
 ## Features
 
 - **Universal Downloading**: Download from direct URLs or 1000+ social media platforms (via yt-dlp)
+- **Universal Media Viewer**: View videos, audio, images, PDFs, and text files directly in the browser
+- **Storage Quota**: Track your storage usage with visual quota display
+- **Frontend Pagination**: Efficiently browse large download collections with paginated views
 - **Background Processing**: Non-blocking downloads with real-time progress tracking
+- **Material 3 Design**: Modern UI following Google's Material Design 3 principles
 - **PWA Support**: Install as a native app, works offline
 - **Privacy-First**: Self-hosted, you control your data
 
 ## Tech Stack
 
-- **Frontend**: Next.js 15, TypeScript, Tailwind CSS
+- **Frontend**: Next.js 15, TypeScript, Tailwind CSS, Actify (Material 3 components)
 - **Backend**: Next.js API Routes, BullMQ + Redis
 - **Database**: PostgreSQL + Prisma
 - **Storage**: MinIO (S3-compatible)
@@ -78,6 +82,9 @@ MINIO_ENDPOINT="http://localhost:9000"
 MINIO_ACCESS_KEY="minioadmin"
 MINIO_SECRET_KEY="minioadmin"
 MINIO_BUCKET="downloads"
+
+# Storage Quota (optional, default: 10GB)
+DEFAULT_STORAGE_LIMIT=10737418240  # 10GB in bytes
 ```
 
 ## API Endpoints
@@ -94,6 +101,16 @@ MINIO_BUCKET="downloads"
 - `DELETE /api/downloads/:id` - Delete download and file
 - `GET /api/downloads/:id/progress` - Get real-time progress
 - `POST /api/downloads/:id/retry` - Retry failed download
+- `GET /api/downloads/:id/content` - Stream/download file content
+
+### User
+- `GET /api/user/quota` - Get user storage quota and usage
+
+### Pages
+- `/` - Submit new download URL
+- `/downloads` - Browse downloads with pagination
+- `/view/[id]` - Universal media viewer
+- `/watch/[id]` - Legacy video player
 
 ## Architecture
 
@@ -110,6 +127,59 @@ Client (Next.js App) → API Routes → BullMQ Queue → Workers
 - ✅ File size limits (Images: 50MB, Videos: 5GB)
 - ✅ Timeout enforcement (1 hour)
 - ✅ Input sanitization with Zod
+
+## Material 3 Design with Actify
+
+This project uses [Actify](https://actifyjs.com/), a React Material Design 3 component library. Key components used:
+
+- **Card** - Elevated cards with state layers and elevation
+- **Button** - Filled, outlined, and text button variants
+- **TextField** - Material-styled input fields with floating labels
+- **LinearProgress** - Progress bars with indeterminate state
+- **Pagination** - Material-style pagination controls
+- **Dialog** - Modal dialogs for confirmations
+
+### Material Symbols
+
+The project uses Google's Material Symbols Outlined font for icons:
+
+```tsx
+import "app/globals.css"; // Includes Material Symbols
+
+<span className="material-symbols-outlined">icon_name</span>
+```
+
+Common icons used:
+- `download`, `play_circle`, `music_note`, `image`, `picture_as_pdf`
+- `delete`, `refresh`, `visibility`, `video_library`
+- `storage`, `check_circle`, `error`, `pending`
+
+## Storage Quota Management
+
+The application tracks storage usage per user with a configurable limit (default: 10GB).
+
+### For Single-User Setup
+
+The quota is initialized automatically on the first download. To check or modify quota:
+
+```bash
+# Check current quota (via psql)
+docker-compose exec db psql -U postgres -d ccdownloader -c "SELECT * FROM \"UserQuota\";"
+
+# Reset quota
+docker-compose exec db psql -U postgres -d ccdownloader -c "UPDATE \"UserQuota\" SET \"totalStorage\" = 0;"
+
+# Set custom limit (in bytes)
+docker-compose exec db psql -U postgres -d ccdownloader -c "UPDATE \"UserQuota\" SET \"storageLimit\" = 21474836480 WHERE \"userId\" = 'YOUR_USER_ID';"
+```
+
+### Recalculate Quota
+
+If quota gets out of sync, recalculate from actual files:
+
+```bash
+docker-compose exec app npm run recalc-quota
+```
 
 ## Troubleshooting
 

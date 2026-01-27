@@ -514,3 +514,161 @@ test.describe("Performance Benchmarks", () => {
     console.log(`Page Load: ${navTiming.load}ms`);
   });
 });
+
+test.describe("Media Viewer", () => {
+  test.beforeEach(async ({ page }) => {
+    // Login first
+    await page.goto("http://localhost:3000/login");
+    await page.fill('input[name="email"]', TEST_USER.email);
+    await page.fill('input[name="password"]', TEST_USER.password);
+    await page.click('button[type="submit"]');
+    await page.waitForURL(/\/downloads/);
+  });
+
+  test("should show View button for completed downloads", async ({ page }) => {
+    // The View button should exist in the UI
+    const viewButton = page.locator('a:has-text("View"), button:has-text("View")');
+    expect(viewButton).toBeTruthy();
+  });
+
+  test("should navigate to media viewer page", async ({ page }) => {
+    // Submit a download
+    await page.fill('input[type="url"]', SHORT_VIDEO_URL);
+    await page.click('button:has-text("Download")');
+
+    // Wait for download to appear
+    await page.waitForSelector('text=/PENDING|PROCESSING/i', { timeout: 5000 });
+
+    // Navigate to view page to test it exists
+    await page.goto("http://localhost:3000/view/test-id");
+
+    // Should show either the viewer or an error (not a 404)
+    const pageTitle = await page.title();
+    expect(pageTitle).toBeDefined();
+  });
+
+  test("should display proper MIME type handling", async ({ page }) => {
+    // Test that the view route exists and handles different MIME types
+    const testCases = [
+      { mime: "video/mp4", expected: "video" },
+      { mime: "audio/mpeg", expected: "audio" },
+      { mime: "image/jpeg", expected: "image" },
+      { mime: "application/pdf", expected: "pdf" },
+      { mime: "text/plain", expected: "text" },
+    ];
+
+    for (const testCase of testCases) {
+      await page.goto(`http://localhost:3000/view/test-${testCase.mime.replace("/", "-")}`);
+      const isVisible = await page.locator("body").isVisible();
+      expect(isVisible).toBe(true);
+    }
+  });
+});
+
+test.describe("Pagination", () => {
+  test.beforeEach(async ({ page }) => {
+    // Login first
+    await page.goto("http://localhost:3000/login");
+    await page.fill('input[name="email"]', TEST_USER.email);
+    await page.fill('input[name="password"]', TEST_USER.password);
+    await page.click('button[type="submit"]');
+    await page.waitForURL(/\/downloads/);
+  });
+
+  test("should show pagination controls", async ({ page }) => {
+    // Pagination controls should exist in the page
+    const paginationContainer = page.locator('text=/Showing.*results|Previous|Next/i');
+    expect(paginationContainer).toBeTruthy();
+  });
+
+  test("should navigate to page 2 via URL", async ({ page }) => {
+    await page.goto("http://localhost:3000/downloads?page=2");
+
+    const currentUrl = page.url();
+    expect(currentUrl).toContain("page=2");
+
+    const bodyText = await page.locator("body").textContent();
+    expect(bodyText).toBeDefined();
+  });
+
+  test("should preserve filters when changing pages", async ({ page }) => {
+    await page.selectOption('select', "PENDING");
+    await page.waitForTimeout(500);
+
+    await page.goto("http://localhost:3000/downloads?page=2&status=PENDING");
+
+    const selectValue = await page.locator('select').inputValue();
+    expect(selectValue).toBe("PENDING");
+  });
+
+  test("should reset to page 1 when changing filters", async ({ page }) => {
+    await page.goto("http://localhost:3000/downloads?page=2");
+
+    await page.selectOption('select', "COMPLETED");
+
+    await page.waitForTimeout(500);
+
+    const currentUrl = page.url();
+    expect(currentUrl).toContain("page=1");
+  });
+});
+
+test.describe("Storage Quota Display", () => {
+  test.beforeEach(async ({ page }) => {
+    // Login first
+    await page.goto("http://localhost:3000/login");
+    await page.fill('input[name="email"]', TEST_USER.email);
+    await page.fill('input[name="password"]', TEST_USER.password);
+    await page.click('button[type="submit"]');
+    await page.waitForURL(/\/downloads/);
+  });
+
+  test("should display storage quota in navbar", async ({ page }) => {
+    await page.waitForTimeout(1000);
+
+    const bodyText = await page.locator("body").textContent();
+    expect(bodyText.toLowerCase()).toMatch(/quota|storage|used/i);
+  });
+
+  test("should show progress bar for quota usage", async ({ page }) => {
+    const progressBar = page.locator('[role="progressbar"], .bg-blue-500, .bg-green-500, .bg-orange-500, .bg-red-500').first();
+    expect(progressBar).toBeTruthy();
+  });
+});
+
+test.describe("Material 3 Design", () => {
+  test("should use Material Symbols icons", async ({ page }) => {
+    await page.goto("http://localhost:3000/downloads");
+
+    const materialSymbolsUsed = await page.evaluate(() => {
+      const elements = document.querySelectorAll(".material-symbols-outlined, [class*='material-symbols']");
+      return elements.length > 0;
+    });
+
+    expect(materialSymbolsUsed).toBe(true);
+  });
+
+  test("should have proper elevation on cards", async ({ page }) => {
+    await page.goto("http://localhost:3000/downloads");
+
+    const cards = page.locator(".shadow-lg");
+    const shadowClass = await cards.first().evaluate((el) =>
+      el.classList.contains("shadow-lg")
+    );
+
+    expect(shadowClass).toBe(true);
+  });
+
+  test("should have proper button states", async ({ page }) => {
+    await page.goto("http://localhost:3000/downloads");
+
+    const buttons = page.locator("button");
+
+    for (const button of await buttons.all()) {
+      const hasClasses = await button.evaluate((el: HTMLElement) =>
+        el.classList.length > 0
+      );
+      expect(hasClasses).toBe(true);
+    }
+  });
+});

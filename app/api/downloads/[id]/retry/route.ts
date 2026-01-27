@@ -8,7 +8,7 @@ import { createApiSpan } from "@/lib/otel";
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
-) {
+): Promise<NextResponse> {
   const { id } = await params;
   return createApiSpan("POST", `/api/downloads/${id}/retry`, async () => {
     const session = await auth();

@@ -7,7 +7,7 @@ import { createApiSpan } from "@/lib/otel";
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
-) {
+): Promise<NextResponse> {
   const { id } = await params;
   return createApiSpan("GET", `/api/downloads/${id}/progress`, async () => {
     // Check authentication
@@ -38,7 +38,6 @@ export async function GET(
       const response: any = {
         downloadId: download.id,
         status: download.status,
-        updatedAt: download.updatedAt,
       };
 
       // Add progress if available

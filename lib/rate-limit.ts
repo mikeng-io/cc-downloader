@@ -1,4 +1,4 @@
-import { redis } from "@/lib/queue";
+import { redis } from "@/lib/redis";
 
 /**
  * Rate limiter using Redis (shared with BullMQ)

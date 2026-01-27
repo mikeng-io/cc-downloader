@@ -9,7 +9,7 @@ import { prisma } from "@/lib/prisma";
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
-) {
+): Promise<Response> {
   const { id } = await params;
 
   // Check authentication

@@ -9,7 +9,7 @@ import { DownloadStatus } from "@prisma/client";
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
-) {
+): Promise<NextResponse> {
   const { id } = await params;
   return createApiSpan("GET", `/api/downloads/${id}`, async () => {
     const session = await auth();
@@ -45,7 +45,7 @@ export async function GET(
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
-) {
+): Promise<NextResponse> {
   const { id } = await params;
   return createApiSpan("DELETE", `/api/downloads/${id}`, async () => {
     const session = await auth();
@@ -84,6 +84,34 @@ export async function DELETE(
       await prisma.download.delete({
         where: { id },
       });
+
+      // Update user storage quota (decrement if file had a size)
+      if (download.fileSize) {
+        try {
+          await prisma.userQuota.update({
+            where: { userId: session.user.id },
+            data: {
+              totalStorage: { decrement: download.fileSize },
+              fileCount: { decrement: 1 },
+            },
+          });
+        } catch (error) {
+          // If quota record doesn't exist, create it with zero values
+          // This handles the case where downloads were created before quota tracking
+          if (error instanceof Error && error.message.includes("Record not found")) {
+            await prisma.userQuota.create({
+              data: {
+                userId: session.user.id,
+                totalStorage: BigInt(0),
+                fileCount: 0,
+                storageLimit: BigInt(10737418240), // 10GB
+              },
+            });
+          } else {
+            console.error("Failed to update user quota after delete:", error);
+          }
+        }
+      }
 
       return NextResponse.json({ success: true });
     } catch (error) {

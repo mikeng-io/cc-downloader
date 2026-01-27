@@ -1,18 +1,18 @@
 FROM node:22-alpine AS base
 
-# Install dependencies for native modules
-RUN apk add --no-cache python3 make g++ openssl
+# Install dependencies for native modules and media processing
+RUN apk add --no-cache python3 make g++ openssl ffmpeg curl
 
-# Install yt-dlp and gallery-dl (for later phases)
-RUN apk add --no-cache py3-pip ffmpeg && \
-    pip3 install --no-cache-dir yt-dlp gallery-dl
+# Install yt-dlp from Alpine packages
+RUN apk add --no-cache yt-dlp
 
 FROM base AS deps
 WORKDIR /app
 
 # Copy package files
 COPY package.json package-lock.json* ./
-RUN npm ci
+# Install dependencies without running postinstall scripts
+RUN npm ci --ignore-scripts
 
 FROM base AS builder
 WORKDIR /app

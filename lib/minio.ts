@@ -70,7 +70,7 @@ export async function uploadFile(
   buffer: Buffer,
   metadata?: Record<string, string>
 ) {
-  await minioClient.putObject(minioBucket, storageKey, buffer, buffer.length, metadata);
+  await minioClient.putObject(minioBucket, storageKey, buffer, buffer.length, metadata || {});
 }
 
 /**
@@ -91,8 +91,8 @@ export async function uploadFileStream(
     // Track upload progress
     let bytesUploaded = 0;
 
-    fileStream.on("data", (chunk: Buffer) => {
-      bytesUploaded += chunk.length;
+    fileStream.on("data", (chunk: Buffer | string) => {
+      bytesUploaded += Buffer.byteLength(String(chunk));
       onProgress?.(bytesUploaded, fileSize);
     });
 
@@ -103,12 +103,12 @@ export async function uploadFileStream(
       storageKey,
       fileStream,
       fileSize,
-      metadata,
-      (err, etag, versionId) => {
+      metadata || {},
+      (err: Error | null, result?: any) => {
         if (err) {
           reject(err);
         } else {
-          resolve({ etag: etag!, versionId });
+          resolve({ etag: result?.etag || "", versionId: result?.versionId });
         }
       }
     );
@@ -130,12 +130,12 @@ export async function uploadReadableStream(
       storageKey,
       stream,
       size,
-      metadata,
-      (err, etag, versionId) => {
+      metadata || {},
+      (err: Error | null, result?: any) => {
         if (err) {
           reject(err);
         } else {
-          resolve({ etag: etag!, versionId });
+          resolve({ etag: result?.etag || "", versionId: result?.versionId });
         }
       }
     );

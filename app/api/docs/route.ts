@@ -18,7 +18,7 @@ const getAllowedOrigins = () => {
   return allowed;
 };
 
-export async function GET(request: NextRequest) {
+export async function GET(request: NextRequest): Promise<NextResponse> {
   const origin = request.headers.get("origin");
   const allowedOrigins = getAllowedOrigins();
 
@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json(openApiDocument, { headers });
 }
 
-export async function OPTIONS(request: NextRequest) {
+export async function OPTIONS(request: NextRequest): Promise<NextResponse> {
   const origin = request.headers.get("origin");
   const allowedOrigins = getAllowedOrigins();
 

@@ -8,8 +8,8 @@ export default function ApiDocsPage() {
   useEffect(() => {
     // Dynamically import Scalar to avoid SSR issues
     import("@scalar/api-reference")
-      .then((mod) => {
-        setScalar(mod.default as any);
+      .then((mod: any) => {
+        setScalar(mod.default || mod.ApiReference || mod);
       })
       .catch((err) => {
         console.error("Failed to load Scalar:", err);

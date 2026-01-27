@@ -1,10 +1,10 @@
 import { promisify } from "util";
 import { execFile } from "child_process";
-import { prisma } from "@/lib/prisma";
-import { ensureBucket, generateStorageKey, uploadFileStream, getPresignedUrl } from "@/lib/minio";
+import { prisma } from "../prisma";
+import { ensureBucket, generateStorageKey, uploadFileStream, getPresignedUrl } from "../minio";
 import { DownloadStatus, MimeType, DownloadType } from "@prisma/client";
 import type { Job } from "bullmq";
-import type { DownloadJobData } from "@/lib/queue";
+import type { DownloadJobData } from "../queue";
 import { mkdir, rm, stat, readdir } from "fs/promises";
 import { join } from "path";
 
@@ -40,7 +40,6 @@ interface YtdlpInfo {
 
 export async function handleYtdlpDownload(job: Job<DownloadJobData>) {
   const { downloadId, userId, url } = job.data;
-  const updateProgress = job.updateProgress;
 
   // Create temp directory for this download
   const tempDir = `/tmp/cc-downloader/${downloadId}`;
@@ -48,7 +47,7 @@ export async function handleYtdlpDownload(job: Job<DownloadJobData>) {
 
   try {
     // Step 1: Get video info first
-    updateProgress?.(10);
+    await job.updateProgress(10);
     const info = await getYtdlpInfo(url);
 
     // Check file size limit
@@ -59,13 +58,19 @@ export async function handleYtdlpDownload(job: Job<DownloadJobData>) {
     }
 
     // Step 2: Download to temporary file using streaming
-    updateProgress?.(20);
-    const { filename, filePath } = await downloadWithYtdlp(url, tempDir, (progress) => {
-      updateProgress?.(20 + Math.floor(progress * 60)); // 20-80% for download
+    await job.updateProgress(20);
+
+    // Log the extension detected from yt-dlp metadata
+    if (info.ext) {
+      console.log(`[yt-dlp] Extension from metadata: ${info.ext} for URL: ${url}`);
+    }
+
+    const { filename, filePath } = await downloadWithYtdlp(url, tempDir, async (progress) => {
+      await job.updateProgress(20 + Math.floor(progress * 60)); // 20-80% for download
     });
 
     // Step 3: Upload to MinIO using streaming (memory efficient)
-    updateProgress?.(85);
+    await job.updateProgress(85);
     await ensureBucket();
 
     const storageKey = generateStorageKey(userId, downloadId, filename);
@@ -82,15 +87,17 @@ export async function handleYtdlpDownload(job: Job<DownloadJobData>) {
         "Content-Type": mimeType,
         "downloaded-from": url,
       },
-      (bytesUploaded, totalBytes) => {
+      async (bytesUploaded, totalBytes) => {
         // Track upload progress: 85-95%
         const uploadProgress = (bytesUploaded / totalBytes) * 10; // 0-10%
-        updateProgress?.(85 + Math.floor(uploadProgress));
+        await job.updateProgress(85 + Math.floor(uploadProgress));
       }
     );
 
     // Step 4: Update database
-    updateProgress?.(95);
+    await job.updateProgress(95);
+
+    const DEFAULT_STORAGE_LIMIT = BigInt(10737418240); // 10GB
 
     await prisma.download.update({
       where: { id: downloadId },
@@ -122,7 +129,28 @@ export async function handleYtdlpDownload(job: Job<DownloadJobData>) {
       },
     });
 
-    updateProgress?.(100);
+    // Step 4.5: Update user storage quota
+    const storageLimit = process.env.DEFAULT_STORAGE_LIMIT
+      ? BigInt(process.env.DEFAULT_STORAGE_LIMIT)
+      : DEFAULT_STORAGE_LIMIT;
+
+    await prisma.userQuota.upsert({
+      where: { userId },
+      update: {
+        totalStorage: { increment: BigInt(fileStats.size) },
+        fileCount: { increment: 1 },
+        lastRecalculated: new Date(),
+      },
+      create: {
+        userId,
+        totalStorage: BigInt(fileStats.size),
+        fileCount: 1,
+        storageLimit,
+        lastRecalculated: new Date(),
+      },
+    });
+
+    await job.updateProgress(100);
 
     // Step 5: Cleanup temp file
     await rm(tempDir, { recursive: true, force: true });
@@ -276,7 +304,6 @@ function getMimeTypeFromExt(ext: string): MimeType {
 // gallery-dl fallback handler
 export async function handleGalleryDlDownload(job: Job<DownloadJobData>) {
   const { downloadId, userId, url } = job.data;
-  const updateProgress = job.updateProgress;
 
   // TODO: Implement gallery-dl download logic
   // Similar to yt-dlp but using gallery-dl commands

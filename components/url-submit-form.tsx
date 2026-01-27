@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { Button } from "actify";
 
 interface UrlSubmitFormProps {
-  onSubmit?: (url: string) => void;
+  onSubmit?: () => void;
 }
 
 export function UrlSubmitForm({ onSubmit }: UrlSubmitFormProps) {
@@ -40,7 +41,7 @@ export function UrlSubmitForm({ onSubmit }: UrlSubmitFormProps) {
 
       // Clear form on success
       setUrl("");
-      onSubmit?.(url);
+      onSubmit?.();
     } catch (err) {
       setError("Network error. Please try again.");
     } finally {
@@ -49,23 +50,27 @@ export function UrlSubmitForm({ onSubmit }: UrlSubmitFormProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="w-full max-w-2xl">
-      <div className="flex flex-col gap-4 sm:flex-row">
+    <form onSubmit={handleSubmit} className="w-full">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <input
           type="url"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           placeholder="Enter URL to download..."
-          className="flex-1 rounded-md border px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="flex-1 min-w-0 rounded-md border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-white dark:placeholder-gray-500"
           disabled={isSubmitting}
         />
-        <button
+        <Button
+          variant="filled"
           type="submit"
-          disabled={isSubmitting || !url.trim()}
-          className="rounded-md bg-blue-600 px-6 py-3 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+          isDisabled={isSubmitting || !url.trim()}
+          className="shrink-0 px-6 py-2.5 whitespace-nowrap"
         >
+          <span className="material-symbols-outlined text-xl align-middle mr-1">
+            download
+          </span>
           {isSubmitting ? "Submitting..." : "Download"}
-        </button>
+        </Button>
       </div>
       {error && (
         <p className="mt-2 text-sm text-red-600 dark:text-red-400">{error}</p>

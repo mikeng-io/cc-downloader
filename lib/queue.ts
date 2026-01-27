@@ -4,6 +4,7 @@ import { prisma } from "./prisma";
 import { DownloadStatus, MimeType } from "@prisma/client";
 import { handleYtdlpDownload, handleGalleryDlDownload } from "./workers/ytdlp-worker";
 import { ensureBucket, generateStorageKey, uploadFile } from "./minio";
+import { getExtensionFromMimeType } from "./mime-types";
 
 // Job types
 export interface DownloadJobData {
@@ -95,7 +96,7 @@ export function createWorker() {
         data: {
           status: DownloadStatus.PROCESSING,
           startedAt: new Date(),
-          retryCount: retryCount > 0 ? retryCount : null,
+          retryCount: retryCount > 0 ? retryCount : 0,
         },
       });
 
@@ -206,7 +207,7 @@ async function handleDirectDownload(job: Job<DownloadJobData>) {
   }
 
   // Get filename from Content-Disposition or URL
-  const filename = getFilenameFromResponse(response, url);
+  const filename = getFilenameFromResponse(response, url, contentType);
 
   // Stream the download and update progress
   const reader = response.body?.getReader();
@@ -262,26 +263,68 @@ async function handleDirectDownload(job: Job<DownloadJobData>) {
     },
   });
 
+  // Update user storage quota
+  const DEFAULT_STORAGE_LIMIT = BigInt(10737418240); // 10GB
+  const storageLimit = process.env.DEFAULT_STORAGE_LIMIT
+    ? BigInt(process.env.DEFAULT_STORAGE_LIMIT)
+    : DEFAULT_STORAGE_LIMIT;
+
+  await prisma.userQuota.upsert({
+    where: { userId },
+    update: {
+      totalStorage: { increment: BigInt(buffer.length) },
+      fileCount: { increment: 1 },
+      lastRecalculated: new Date(),
+    },
+    create: {
+      userId,
+      totalStorage: BigInt(buffer.length),
+      fileCount: 1,
+      storageLimit,
+      lastRecalculated: new Date(),
+    },
+  });
+
   updateProgress(100);
 }
 
-function getFilenameFromResponse(response: Response, url: string): string {
+function getFilenameFromResponse(response: Response, url: string, contentType: string | null): string {
+  let filename = "download";
+
+  // Try Content-Disposition header first
   const contentDisposition = response.headers.get("content-disposition");
   if (contentDisposition) {
     const match = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
     if (match?.[1]) {
-      return match[1].replace(/['"]/g, "");
+      filename = match[1].replace(/['"]/g, "");
     }
   }
 
-  // Fallback to URL path
-  try {
-    const urlPath = new URL(url).pathname;
-    const segments = urlPath.split("/").filter(Boolean);
-    return segments[segments.length - 1] || "download";
-  } catch {
-    return "download";
+  // Fallback to URL path if no Content-Disposition
+  if (filename === "download") {
+    try {
+      const urlPath = new URL(url).pathname;
+      const segments = urlPath.split("/").filter(Boolean);
+      filename = segments[segments.length - 1] || "download";
+    } catch {
+      filename = "download";
+    }
   }
+
+  // Add file extension from Content-Type if filename doesn't have one
+  if (contentType && !filename.includes(".")) {
+    const extension = getExtensionFromMimeType(contentType);
+    if (extension) {
+      filename = `${filename}${extension}`;
+      console.log(`[Direct Download] Added extension from Content-Type: ${contentType} -> ${extension}`);
+    } else {
+      console.warn(`[Direct Download] Could not determine extension for Content-Type: ${contentType}, URL: ${url}`);
+    }
+  } else if (!filename.includes(".")) {
+    console.warn(`[Direct Download] No extension found for filename: ${filename}, URL: ${url}, Content-Type: ${contentType || "none"}`);
+  }
+
+  return filename;
 }
 
 async function updateProgress(

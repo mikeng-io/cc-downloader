@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  output: 'standalone',
+  // Fix workspace root detection for module resolution
+  outputFileTracingRoot: process.cwd(),
   /* config options here */
   async headers() {
     return [
@@ -38,9 +41,9 @@ const nextConfig: NextConfig = {
             value: [
               "default-src 'self'",
               "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
-              "style-src 'self' 'unsafe-inline'",
+              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "img-src 'self' data: https: blob:",
-              "font-src 'self'",
+              "font-src 'self' https://fonts.gstatic.com",
               "object-src 'none'",
               "base-uri 'self'",
               "form-action 'self'",

@@ -1,60 +1,105 @@
-version: "3.8"
-
 services:
-  app:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:17-alpine
+    container_name: cc-downloader-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: ccdownloader
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for BullMQ
+  redis:
+    image: redis:7-alpine
+    container_name: cc-downloader-redis
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MinIO Object Storage
+  minio:
+    image: minio/minio:latest
+    container_name: cc-downloader-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - miniodata:/data
+    ports:
+      - "9100:9000"
+      - "9101:9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # Next.js Web Application
+  web:
     build:
       context: .
       dockerfile: Dockerfile
+    container_name: cc-downloader-web
     ports:
       - "3000:3000"
     environment:
-      - DATABASE_URL=postgresql://postgres:devpassword@postgres:5432/ccdownloader
-      - REDIS_URL=redis://redis:6379
-      - MINIO_ENDPOINT=http://minio:9000
-      - MINIO_ACCESS_KEY=minioadmin
-      - MINIO_SECRET_KEY=minioadmin
-      - MINIO_BUCKET=downloads
-      - NEXTAUTH_URL=http://localhost:3000
-      - NEXTAUTH_SECRET=development-secret-change-in-production
-      - ADMIN_EMAIL=admin@example.com
-      - ADMIN_PASSWORD=admin
+      NODE_ENV: production
+      DATABASE_URL: postgresql://postgres:password@postgres:5432/ccdownloader
+      REDIS_URL: redis://redis:6379
+      NEXTAUTH_URL: http://localhost:3000
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-cc-downloader-production-secret-change-me}
+      AUTH_TRUST_HOST: "true"
+      YTDLP_PATH: /usr/local/bin/yt-dlp
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET: downloads
     depends_on:
-      - postgres
-      - redis
-      - minio
-    volumes:
-      - .:/app
-      - /app/node_modules
-      - /app/.next
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    restart: unless-stopped
 
-  postgres:
-    image: postgres:17-alpine
+  # BullMQ Worker
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: cc-downloader-worker
     environment:
-      - POSTGRES_PASSWORD=devpassword
-      - POSTGRES_DB=ccdownloader
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
-
-  redis:
-    image: redis:7-alpine
-    volumes:
-      - redisdata:/data
-    ports:
-      - "6379:6379"
-
-  minio:
-    image: minio/minio:latest
-    command: server /data --console-address ":9001"
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    environment:
-      - MINIO_ROOT_USER=minioadmin
-      - MINIO_ROOT_PASSWORD=minioadmin
-    volumes:
-      - miniodata:/data
+      NODE_ENV: production
+      DATABASE_URL: postgresql://postgres:password@postgres:5432/ccdownloader
+      REDIS_URL: redis://redis:6379
+      YTDLP_PATH: /usr/local/bin/yt-dlp
+      YTDLP_TIMEOUT: 3600000
+      YTDLP_MAX_FILE_SIZE: 5368709120
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET: downloads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    restart: unless-stopped
 
 volumes:
   pgdata:

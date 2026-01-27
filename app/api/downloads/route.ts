@@ -7,7 +7,7 @@ import { addDownloadJob } from "@/lib/queue";
 import { DownloadStatus, MimeType } from "@prisma/client";
 import { createApiSpan } from "@/lib/otel";
 
-export async function POST(request: NextRequest) {
+export async function POST(request: NextRequest): Promise<NextResponse> {
   // Check authentication first (outside telemetry wrapper)
   const session = await auth();
   if (!session?.user?.id) {
@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
   });
 }
 
-export async function GET(request: NextRequest) {
+export async function GET(request: NextRequest): Promise<NextResponse> {
   // Check authentication first (outside telemetry wrapper)
   const session = await auth();
   if (!session?.user?.id) {
@@ -123,7 +123,7 @@ export async function GET(request: NextRequest) {
         );
       }
 
-      const where: { userId: string; status?: string; downloadType?: string } = {
+      const where: any = {
         userId: session.user.id,
       };
 
@@ -148,8 +148,19 @@ export async function GET(request: NextRequest) {
         prisma.download.count({ where }),
       ]);
 
+      // Convert BigInt to string for JSON serialization
+      const serializedDownloads = downloads.map((download) => ({
+        ...download,
+        fileSize: download.fileSize?.toString() || null,
+        progress: download.progress ? {
+          ...download.progress,
+          bytesDownloaded: download.progress.bytesDownloaded?.toString() || "0",
+          totalBytes: download.progress.totalBytes?.toString() || null,
+        } : null,
+      }));
+
       return NextResponse.json({
-        downloads,
+        downloads: serializedDownloads,
         pagination: {
           page,
           limit,

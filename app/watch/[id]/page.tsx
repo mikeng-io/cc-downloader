@@ -2,7 +2,6 @@ import { notFound, redirect } from "next/navigation";
 import { VideoPlayer } from "@/components/video-player";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { minioClient } from "@/lib/minio";
 
 interface WatchPageProps {
   params: Promise<{ id: string }>;
@@ -43,20 +42,9 @@ export default async function WatchPage({ params }: WatchPageProps) {
     redirect("/downloads");
   }
 
-  // Get presigned URL from MinIO for streaming (1 hour for security)
-  let videoUrl = "";
-
-  try {
-    // Presigned URL valid for 1 hour (3600 seconds) - reduced from 24h for security
-    videoUrl = await minioClient.presignedGetObject(
-      "downloads",
-      download.storagePath,
-      3600
-    );
-  } catch (error) {
-    console.error("Failed to generate presigned URL:", error);
-    redirect("/downloads");
-  }
+  // Use streaming API endpoint instead of direct MinIO presigned URL
+  // This works in both local and container environments
+  const videoUrl = `/api/downloads/${download.id}/content`;
 
   // Format file size for display
   const formatFileSize = (bytes: number) => {
@@ -87,8 +75,7 @@ export default async function WatchPage({ params }: WatchPageProps) {
         <div className="mb-6 aspect-video w-full overflow-hidden rounded-lg bg-black shadow-lg">
           <VideoPlayer
             src={videoUrl}
-            poster={thumbnailUrl || undefined}
-            title={download.title}
+            title={download.title || "Video"}
             className="w-full h-full"
           />
         </div>
@@ -121,7 +108,7 @@ export default async function WatchPage({ params }: WatchPageProps) {
                 File Size
               </p>
               <p className="mt-1 text-sm text-gray-900 dark:text-white">
-                {download.fileSize ? formatFileSize(download.fileSize) : "Unknown"}
+                {download.fileSize ? formatFileSize(Number(download.fileSize)) : "Unknown"}
               </p>
             </div>
 

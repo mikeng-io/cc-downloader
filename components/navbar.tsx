@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { StorageQuotaDisplay } from "@/components/storage-quota-display";
 import { auth, signOut } from "@/lib/auth";
 import { useEffect, useState } from "react";
 
@@ -25,6 +26,7 @@ export function Navbar() {
   return (
     <nav className="border-b bg-white dark:bg-gray-900">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        {/* Main nav row */}
         <div className="flex h-16 justify-between">
           <div className="flex items-center gap-8">
             <Link href="/" className="text-xl font-bold">
@@ -34,9 +36,6 @@ export function Navbar() {
               <div className="hidden md:flex items-center gap-6 text-sm">
                 <Link href="/downloads" className="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white">
                   Downloads
-                </Link>
-                <Link href="/docs" className="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white">
-                  API Docs
                 </Link>
               </div>
             )}
@@ -80,6 +79,13 @@ export function Navbar() {
             )}
           </div>
         </div>
+
+        {/* Quota display row - only shown when logged in */}
+        {session?.user && (
+          <div className="py-3 border-t border-gray-100 dark:border-gray-800">
+            <StorageQuotaDisplay />
+          </div>
+        )}
       </div>
     </nav>
   );

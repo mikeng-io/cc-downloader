@@ -1,4 +1,5 @@
 import { DownloadProgress } from "@/lib/hooks/use-download-progress";
+import { LinearProgress } from "actify";
 
 interface ProgressBarProps {
   progress: DownloadProgress;
@@ -24,7 +25,7 @@ export function ProgressBar({ progress }: ProgressBarProps) {
     return `${formatBytes(bytesPerSecond)}/s`;
   };
 
-  const formatEta = (seconds: number | null): string => {
+  const formatEta = (seconds: number | null | undefined): string => {
     if (!seconds || seconds < 0) return "";
     if (seconds < 60) return `${seconds}s left`;
     if (seconds < 3600) return `${Math.ceil(seconds / 60)}m left`;
@@ -34,14 +35,14 @@ export function ProgressBar({ progress }: ProgressBarProps) {
   const getStatusColor = () => {
     switch (progress.status) {
       case "COMPLETED":
-        return "bg-green-500";
+        return "primary";
       case "FAILED":
       case "CANCELLED":
-        return "bg-red-500";
+        return "error";
       case "PROCESSING":
-        return "bg-blue-500";
+        return "primary";
       default:
-        return "bg-gray-500";
+        return "primary";
     }
   };
 
@@ -59,12 +60,7 @@ export function ProgressBar({ progress }: ProgressBarProps) {
           {eta !== null && <span>{formatEta(eta)}</span>}
         </div>
       </div>
-      <div className="h-2 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
-        <div
-          className={`h-full transition-all duration-300 ${getStatusColor()}`}
-          style={{ width: `${Math.min(percentage, 100)}%` }}
-        />
-      </div>
+      <LinearProgress value={Math.min(percentage, 100)} color={getStatusColor()} />
       {progress.error && (
         <p className="mt-2 text-sm text-red-600 dark:text-red-400">
           {progress.error.message}

@@ -8,7 +8,7 @@ const getRedisUrl = () => {
 };
 
 export const redis = new Redis(getRedisUrl(), {
-  maxRetriesPerRequest: 3,
+  maxRetriesPerRequest: null, // Required by BullMQ
   retryStrategy: (times) => {
     if (times > 3) {
       return null;
