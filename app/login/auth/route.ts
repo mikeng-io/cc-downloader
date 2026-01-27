@@ -40,6 +40,25 @@ export async function POST(request: NextRequest) {
     // Redirect to downloads on success
     return NextResponse.redirect(new URL("/downloads", BASE_URL));
   } catch (error) {
+    // NextAuth wraps errors in CallbackRouteError with structure: { cause: { err: Error } }
+    const cause = (error as { cause?: { err?: Error } })?.cause;
+    const originalError = cause?.err;
+    const errorMessage = originalError?.message || (error instanceof Error ? error.message : "");
+
+    // Check if the error is due to unverified email
+    if (errorMessage.includes("verify your email")) {
+      return NextResponse.redirect(
+        new URL(`/verify?email=${encodeURIComponent(email)}`, BASE_URL)
+      );
+    }
+
+    // Check if account is locked
+    if (errorMessage.includes("Account temporarily locked")) {
+      return NextResponse.redirect(
+        new URL(`/login?error=${encodeURIComponent(errorMessage)}`, BASE_URL)
+      );
+    }
+
     console.error("Login error:", error);
     return NextResponse.redirect(
       new URL(`/login?error=${encodeURIComponent("An error occurred during login")}`, BASE_URL)
