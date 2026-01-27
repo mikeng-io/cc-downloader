@@ -1,36 +1,12 @@
 "use client";
 
-import { useTransition } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { Button } from "actify";
 
-interface RegisterFormProps {
-  action: (formData: FormData) => Promise<void>;
-}
-
-export function RegisterForm({ action }: RegisterFormProps) {
+export function RegisterForm() {
   const searchParams = useSearchParams();
-  const router = useRouter();
-  const [isPending, startTransition] = useTransition();
   const error = searchParams.get("error");
-
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-
-    startTransition(async () => {
-      const response = await fetch("/register/auth", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (response.redirected) {
-        router.push(response.url);
-      }
-    });
-  };
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12 dark:bg-gray-950">
@@ -43,7 +19,10 @@ export function RegisterForm({ action }: RegisterFormProps) {
               Create your account
             </h2>
             <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-              Start downloading media with CC-Downloader
+              Start downloading media with Downloader
+            </p>
+            <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+              Registration is by invitation only
             </p>
           </div>
 
@@ -61,7 +40,7 @@ export function RegisterForm({ action }: RegisterFormProps) {
           )}
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form action="/register/auth" method="POST" className="space-y-6">
             <div>
               <label htmlFor="email" className="mb-1 block text-sm font-medium text-gray-900 dark:text-white">
                 Email
@@ -71,7 +50,6 @@ export function RegisterForm({ action }: RegisterFormProps) {
                 name="email"
                 type="email"
                 required
-                disabled={isPending}
                 className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
                 placeholder="you@example.com"
               />
@@ -86,7 +64,6 @@ export function RegisterForm({ action }: RegisterFormProps) {
                 type="password"
                 required
                 minLength={12}
-                disabled={isPending}
                 className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
                 placeholder="••••••••••••"
               />
@@ -104,7 +81,6 @@ export function RegisterForm({ action }: RegisterFormProps) {
                 type="password"
                 required
                 minLength={12}
-                disabled={isPending}
                 className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
                 placeholder="••••••••••••"
               />
@@ -113,10 +89,9 @@ export function RegisterForm({ action }: RegisterFormProps) {
             <Button
               variant="filled"
               type="submit"
-              isDisabled={isPending}
               className="w-full"
             >
-              {isPending ? "Creating account..." : "Create Account"}
+              Create Account
             </Button>
           </form>
 
