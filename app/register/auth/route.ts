@@ -7,7 +7,6 @@ import {
   isAllowedEmailDomain,
   generateVerificationCode,
   sendVerificationEmail,
-  ALLOWED_EMAIL_DOMAINS,
 } from "@/lib/email";
 
 const BASE_URL = process.env.NEXTAUTH_URL || "http://localhost:3000";
@@ -43,7 +42,7 @@ export async function POST(request: NextRequest) {
   // Check email domain restriction early (before registration)
   if (!isAllowedEmailDomain(email)) {
     return NextResponse.redirect(
-      new URL(`/register?error=${encodeURIComponent(`Registration is restricted to ${ALLOWED_EMAIL_DOMAINS.join(" and ")} email addresses only.`)}`, BASE_URL)
+      new URL(`/register?error=${encodeURIComponent("Registration is by invitation only. Please use an authorized email address.")}`, BASE_URL)
     );
   }
 
