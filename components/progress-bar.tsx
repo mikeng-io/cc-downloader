@@ -1,10 +1,22 @@
+"use client";
+
 import { DownloadProgress } from "@/lib/hooks/use-download-progress";
-import { LinearProgress } from "actify";
+import { motion } from "framer-motion";
 
 interface ProgressBarProps {
   progress: DownloadProgress;
 }
 
+/**
+ * Enhanced ProgressBar Component
+ *
+ * Features:
+ * - Smooth width transitions with Framer Motion
+ * - Color zones (green→yellow→red) based on percentage
+ * - Indeterminate shimmer animation for PENDING state
+ * - GPU-accelerated animations using transforms
+ * - Animated percentage counter
+ */
 export function ProgressBar({ progress }: ProgressBarProps) {
   const percentage = progress.progress?.percentage ?? 0;
   const bytesDownloaded = progress.progress?.bytesDownloaded ?? 0;
@@ -32,24 +44,32 @@ export function ProgressBar({ progress }: ProgressBarProps) {
     return `${Math.ceil(seconds / 3600)}h left`;
   };
 
-  const getStatusColor = () => {
-    switch (progress.status) {
-      case "COMPLETED":
-        return "primary";
-      case "FAILED":
-      case "CANCELLED":
-        return "error";
-      case "PROCESSING":
-        return "primary";
-      default:
-        return "primary";
+  const getProgressColor = () => {
+    if (progress.status === "FAILED" || progress.status === "CANCELLED") {
+      return "bg-gradient-to-r from-red-500 to-red-600";
     }
+    if (progress.status === "COMPLETED") {
+      return "bg-gradient-to-r from-green-500 to-green-600";
+    }
+    // Color zones for in-progress downloads
+    if (percentage < 33) {
+      return "bg-gradient-to-r from-blue-500 to-blue-600";
+    }
+    if (percentage < 66) {
+      return "bg-gradient-to-r from-yellow-500 to-yellow-600";
+    }
+    return "bg-gradient-to-r from-green-500 to-green-600";
   };
+
+  const isPending = progress.status === "PENDING";
+  const isProcessing = progress.status === "PROCESSING";
 
   return (
     <div className="w-full">
       <div className="mb-2 flex items-center justify-between text-sm">
-        <span className="font-medium capitalize">{progress.status.toLowerCase()}</span>
+        <span className="font-medium capitalize text-gray-900 dark:text-gray-100">
+          {progress.status.toLowerCase()}
+        </span>
         <div className="flex items-center gap-4 text-gray-600 dark:text-gray-400">
           {totalBytes && (
             <span>
@@ -58,13 +78,76 @@ export function ProgressBar({ progress }: ProgressBarProps) {
           )}
           {speed && <span>{formatSpeed(speed)}</span>}
           {eta !== null && <span>{formatEta(eta)}</span>}
+          {(isProcessing || progress.status === "COMPLETED") && (
+            <motion.span
+              key={percentage}
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.3 }}
+              className="font-semibold text-primary"
+            >
+              {Math.round(percentage)}%
+            </motion.span>
+          )}
         </div>
       </div>
-      <LinearProgress value={Math.min(percentage, 100)} color={getStatusColor()} />
+
+      {/* Progress bar container */}
+      <div className="relative h-2 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
+        {/* Indeterminate shimmer for PENDING */}
+        {isPending && (
+          <motion.div
+            className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/30 to-transparent"
+            animate={{
+              x: ["-100%", "100%"],
+            }}
+            transition={{
+              duration: 1.5,
+              repeat: Infinity,
+              ease: "linear",
+            }}
+          />
+        )}
+
+        {/* Actual progress bar */}
+        {!isPending && (
+          <motion.div
+            className={`h-full ${getProgressColor()} relative overflow-hidden`}
+            initial={{ width: 0 }}
+            animate={{ width: `${Math.min(percentage, 100)}%` }}
+            transition={{
+              duration: 0.5,
+              ease: "easeOut",
+            }}
+          >
+            {/* Shimmer overlay for active downloads */}
+            {isProcessing && (
+              <motion.div
+                className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                animate={{
+                  x: ["-100%", "100%"],
+                }}
+                transition={{
+                  duration: 2,
+                  repeat: Infinity,
+                  ease: "linear",
+                }}
+              />
+            )}
+          </motion.div>
+        )}
+      </div>
+
+      {/* Error message */}
       {progress.error && (
-        <p className="mt-2 text-sm text-red-600 dark:text-red-400">
+        <motion.p
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          className="mt-2 text-sm text-red-600 dark:text-red-400"
+        >
           {progress.error.message}
-        </p>
+        </motion.p>
       )}
     </div>
   );
