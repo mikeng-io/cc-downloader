@@ -10,5 +10,5 @@ export default async function RegisterPage(props: { searchParams: Promise<{ erro
     redirect("/downloads");
   }
 
-  return <RegisterForm action={async () => {}} />;
+  return <RegisterForm />;
 }
