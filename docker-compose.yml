@@ -65,7 +65,7 @@ services:
       NEXTAUTH_URL: http://localhost:3000
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-downloader-production-secret-change-me}
       AUTH_TRUST_HOST: "true"
-      YTDLP_PATH: /usr/local/bin/yt-dlp
+      YTDLP_PATH: /usr/bin/yt-dlp
       MINIO_ENDPOINT: http://minio:9000
       MINIO_ACCESS_KEY: minioadmin
       MINIO_SECRET_KEY: minioadmin
@@ -89,7 +89,7 @@ services:
       NODE_ENV: production
       DATABASE_URL: postgresql://postgres:password@postgres:5432/ccdownloader
       REDIS_URL: redis://redis:6379
-      YTDLP_PATH: /usr/local/bin/yt-dlp
+      YTDLP_PATH: /usr/bin/yt-dlp
       YTDLP_TIMEOUT: 3600000
       YTDLP_MAX_FILE_SIZE: 5368709120
       MINIO_ENDPOINT: http://minio:9000

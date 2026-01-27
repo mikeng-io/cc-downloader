@@ -68,7 +68,7 @@ services:
       NEXTAUTH_URL: ${NEXTAUTH_URL:?NEXTAUTH_URL is required}
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?NEXTAUTH_SECRET is required}
       AUTH_TRUST_HOST: "true"
-      YTDLP_PATH: /usr/local/bin/yt-dlp
+      YTDLP_PATH: /usr/bin/yt-dlp
       MINIO_ENDPOINT: http://minio:9000
       MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
@@ -122,7 +122,7 @@ services:
       NODE_ENV: production
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-downloader}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
-      YTDLP_PATH: /usr/local/bin/yt-dlp
+      YTDLP_PATH: /usr/bin/yt-dlp
       YTDLP_TIMEOUT: ${YTDLP_TIMEOUT:-3600000}
       YTDLP_MAX_FILE_SIZE: ${YTDLP_MAX_FILE_SIZE:-5368709120}
       MINIO_ENDPOINT: http://minio:9000
