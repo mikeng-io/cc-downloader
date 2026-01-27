@@ -5,6 +5,8 @@ import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { DownloadCard } from "@/components/download-card";
 import { UrlSubmitForm } from "@/components/url-submit-form";
 import { Pagination } from "@/components/pagination";
+import { TextField, Select, Button } from "actify";
+import { motion } from "framer-motion";
 
 interface Download {
   id: string;
@@ -122,12 +124,12 @@ export function DownloadsContent() {
         </div>
 
         {/* Filters and View Toggle */}
-        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
             <select
               value={currentFilter}
               onChange={(e) => handleFilterChange(e.target.value)}
-              className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+              className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary dark:border-gray-700 dark:bg-gray-800 dark:text-white"
             >
               <option value="all">All</option>
               <option value="PENDING">Pending</option>
@@ -136,42 +138,37 @@ export function DownloadsContent() {
               <option value="FAILED">Failed</option>
             </select>
 
-            <input
+            <TextField
               type="text"
               value={currentSearch}
-              onChange={(e) => handleSearchChange(e.target.value)}
-              placeholder="Search by filename..."
-              className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500 sm:w-64"
+              onChange={(e) => handleSearchChange((e.target as HTMLInputElement).value)}
+              label="Search by filename..."
+              variant="outlined"
+              className="w-full sm:w-64"
             />
           </div>
 
           <div className="flex items-center gap-2">
-            <button
+            <Button
+              variant={view === "list" ? "filled" : "outlined"}
               onClick={() => setView("list")}
-              className={`rounded-md px-3 py-2 text-sm transition-colors ${
-                view === "list"
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-200 text-gray-900 hover:bg-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600"
-              }`}
+              className="px-3 py-2"
               aria-label="List view"
             >
-              <span className="material-symbols-outlined text-xl align-middle">
+              <span className="material-symbols-outlined text-xl">
                 view_list
               </span>
-            </button>
-            <button
+            </Button>
+            <Button
+              variant={view === "grid" ? "filled" : "outlined"}
               onClick={() => setView("grid")}
-              className={`rounded-md px-3 py-2 text-sm transition-colors ${
-                view === "grid"
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-200 text-gray-900 hover:bg-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600"
-              }`}
+              className="px-3 py-2"
               aria-label="Grid view"
             >
-              <span className="material-symbols-outlined text-xl align-middle">
+              <span className="material-symbols-outlined text-xl">
                 grid_view
               </span>
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -188,23 +185,41 @@ export function DownloadsContent() {
           </div>
         ) : (
           <>
-            <div
+            <motion.div
+              layout
               className={
                 view === "list"
                   ? "grid gap-4"
-                  : "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+                  : "grid auto-rows-fr gap-4"
               }
+              style={{
+                gridTemplateColumns: view === "grid"
+                  ? "repeat(auto-fill, minmax(280px, 1fr))"
+                  : undefined
+              }}
             >
-              {downloads.map((download) => (
-                <DownloadCard
+              {downloads.map((download, index) => (
+                <motion.div
                   key={download.id}
-                  downloadId={download.id}
-                  sourceUrl={download.sourceUrl}
-                  downloadType={download.downloadType}
-                  createdAt={download.createdAt}
-                />
+                  layout
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  transition={{
+                    duration: 0.3,
+                    delay: index * 0.05,
+                  }}
+                >
+                  <DownloadCard
+                    downloadId={download.id}
+                    sourceUrl={download.sourceUrl}
+                    downloadType={download.downloadType}
+                    createdAt={download.createdAt}
+                    onDeleted={fetchDownloads}
+                  />
+                </motion.div>
               ))}
-            </div>
+            </motion.div>
 
             {/* Pagination */}
             {pagination && pagination.totalPages > 1 && (

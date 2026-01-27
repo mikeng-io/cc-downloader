@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "actify";
+import { Button, TextField } from "actify";
+import { motion } from "framer-motion";
 
 interface UrlSubmitFormProps {
   onSubmit?: () => void;
@@ -11,10 +12,12 @@ export function UrlSubmitForm({ onSubmit }: UrlSubmitFormProps) {
   const [url, setUrl] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [success, setSuccess] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setSuccess(false);
 
     if (!url.trim()) {
       setError("Please enter a URL");
@@ -39,9 +42,15 @@ export function UrlSubmitForm({ onSubmit }: UrlSubmitFormProps) {
         return;
       }
 
-      // Clear form on success
-      setUrl("");
-      onSubmit?.();
+      // Show success animation
+      setSuccess(true);
+
+      // Clear form after animation
+      setTimeout(() => {
+        setUrl("");
+        setSuccess(false);
+        onSubmit?.();
+      }, 1000);
     } catch (err) {
       setError("Network error. Please try again.");
     } finally {
@@ -51,29 +60,58 @@ export function UrlSubmitForm({ onSubmit }: UrlSubmitFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="w-full">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <input
-          type="url"
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          placeholder="Enter URL to download..."
-          className="flex-1 min-w-0 rounded-md border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-white dark:placeholder-gray-500"
-          disabled={isSubmitting}
-        />
-        <Button
-          variant="filled"
-          type="submit"
-          isDisabled={isSubmitting || !url.trim()}
-          className="shrink-0 px-6 py-2.5 whitespace-nowrap"
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+        <div className="flex-1 min-w-0">
+          <TextField
+            type="url"
+            value={url}
+            onChange={(e) => setUrl((e.target as HTMLInputElement).value)}
+            label="Enter URL to download..."
+            variant="outlined"
+            disabled={isSubmitting}
+            error={!!error}
+            className="w-full"
+          />
+        </div>
+
+        <motion.div
+          whileTap={{ scale: 0.98 }}
+          className="shrink-0"
         >
-          <span className="material-symbols-outlined text-xl align-middle mr-1">
-            download
-          </span>
-          {isSubmitting ? "Submitting..." : "Download"}
-        </Button>
+          <Button
+            variant="filled"
+            type="submit"
+            isDisabled={isSubmitting || !url.trim()}
+            className="px-6 py-3 whitespace-nowrap"
+          >
+            {success ? (
+              <motion.span
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                className="material-symbols-outlined text-xl align-middle"
+              >
+                check_circle
+              </motion.span>
+            ) : (
+              <>
+                <span className="material-symbols-outlined text-xl align-middle mr-1">
+                  {isSubmitting ? "sync" : "download"}
+                </span>
+                {isSubmitting ? "Submitting..." : "Download"}
+              </>
+            )}
+          </Button>
+        </motion.div>
       </div>
+
       {error && (
-        <p className="mt-2 text-sm text-red-600 dark:text-red-400">{error}</p>
+        <motion.p
+          initial={{ opacity: 0, x: -10 }}
+          animate={{ opacity: 1, x: 0 }}
+          className="mt-2 text-sm text-red-600 dark:text-red-400"
+        >
+          {error}
+        </motion.p>
       )}
     </form>
   );

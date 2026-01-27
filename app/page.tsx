@@ -1,10 +1,23 @@
 import { UrlSubmitForm } from "@/components/url-submit-form";
+import { StatsDashboard } from "@/components/stats-dashboard";
+import { RecentDownloads } from "@/components/recent-downloads";
 
+/**
+ * Homepage
+ *
+ * Redesigned homepage with:
+ * - URL submission form at top
+ * - Stats dashboard showing real-time statistics
+ * - Recent downloads widget with pagination
+ *
+ * All components include real-time updates via polling
+ */
 export default function HomePage() {
   return (
-    <main className="min-h-screen bg-gray-50 p-8 dark:bg-gray-950">
-      <div className="mx-auto max-w-4xl">
-        <div className="mb-8 text-center">
+    <main className="min-h-screen bg-gray-50 p-4 dark:bg-gray-950 sm:p-8">
+      <div className="mx-auto max-w-7xl space-y-8">
+        {/* Header */}
+        <div className="text-center">
           <h1 className="text-4xl font-bold text-gray-900 dark:text-white">
             CC-Downloader
           </h1>
@@ -13,18 +26,16 @@ export default function HomePage() {
           </p>
         </div>
 
-        <div className="mb-12">
+        {/* URL Submit Form */}
+        <div className="mx-auto max-w-4xl">
           <UrlSubmitForm />
         </div>
 
-        <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-800">
-          <h2 className="mb-4 text-xl font-semibold text-gray-900 dark:text-white">
-            Recent Downloads
-          </h2>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            No downloads yet. Submit a URL above to get started.
-          </p>
-        </div>
+        {/* Stats Dashboard */}
+        <StatsDashboard />
+
+        {/* Recent Downloads */}
+        <RecentDownloads />
       </div>
     </main>
   );
