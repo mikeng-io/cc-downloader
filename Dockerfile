@@ -1,10 +1,7 @@
 FROM node:22-alpine AS base
 
-# Install dependencies for native modules and media processing
-RUN apk add --no-cache python3 make g++ openssl ffmpeg curl
-
-# Install yt-dlp from Alpine packages
-RUN apk add --no-cache yt-dlp
+# Install dependencies for native modules
+RUN apk add --no-cache python3 make g++ openssl
 
 FROM base AS deps
 WORKDIR /app

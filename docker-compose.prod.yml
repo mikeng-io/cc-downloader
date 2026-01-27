@@ -68,7 +68,6 @@ services:
       NEXTAUTH_URL: ${NEXTAUTH_URL:?NEXTAUTH_URL is required}
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?NEXTAUTH_SECRET is required}
       AUTH_TRUST_HOST: "true"
-      YTDLP_PATH: /usr/bin/yt-dlp
       MINIO_ENDPOINT: http://minio:9000
       MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}

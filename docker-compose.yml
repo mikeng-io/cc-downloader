@@ -65,7 +65,6 @@ services:
       NEXTAUTH_URL: http://localhost:3000
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-downloader-production-secret-change-me}
       AUTH_TRUST_HOST: "true"
-      YTDLP_PATH: /usr/bin/yt-dlp
       MINIO_ENDPOINT: http://minio:9000
       MINIO_ACCESS_KEY: minioadmin
       MINIO_SECRET_KEY: minioadmin
