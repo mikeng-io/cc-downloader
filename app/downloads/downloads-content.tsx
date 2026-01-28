@@ -90,9 +90,17 @@ export function DownloadsContent() {
 
   useEffect(() => {
     fetchDownloads();
-    const interval = setInterval(fetchDownloads, 5000);
-    return () => clearInterval(interval);
-  }, [fetchDownloads]);
+
+    // Only poll if there are active downloads (PENDING or PROCESSING)
+    const hasActiveDownloads = downloads.some(
+      (d) => d.status === "PENDING" || d.status === "PROCESSING"
+    );
+
+    if (hasActiveDownloads) {
+      const interval = setInterval(fetchDownloads, 5000);
+      return () => clearInterval(interval);
+    }
+  }, [fetchDownloads, downloads]);
 
   const handleFilterChange = (value: string) => {
     updateUrlParams({ status: value === "all" ? null : value });
