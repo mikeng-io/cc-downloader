@@ -98,7 +98,7 @@ clean:
 
 # Database commands
 db-migrate:
-	docker exec downloader-web npx prisma migrate deploy
+	docker exec downloader-web ./node_modules/.bin/prisma migrate deploy
 
 db-shell:
 	@. .env.prod 2>/dev/null && docker exec -it downloader-postgres psql -U $${POSTGRES_USER:-postgres} -d $${POSTGRES_DB:-downloader}
