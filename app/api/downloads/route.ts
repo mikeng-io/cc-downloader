@@ -38,6 +38,27 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         );
       }
 
+      // Check for duplicate URL (pending, processing, or completed)
+      const existingDownload = await prisma.download.findFirst({
+        where: {
+          userId: session.user.id,
+          sourceUrl: url,
+          status: {
+            in: [DownloadStatus.PENDING, DownloadStatus.PROCESSING, DownloadStatus.COMPLETED],
+          },
+        },
+      });
+
+      if (existingDownload) {
+        const statusMessage = existingDownload.status === DownloadStatus.COMPLETED
+          ? "You have already downloaded this URL"
+          : "This URL is already being downloaded";
+        return NextResponse.json(
+          { error: statusMessage, existingId: existingDownload.id },
+          { status: 409 }
+        );
+      }
+
       // Detect download type
       const downloadType = detectDownloadType(url);
 
