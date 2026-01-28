@@ -100,7 +100,7 @@ clean:
 db-migrate:
 	@set -a && . ./.env.prod && set +a && \
 	docker run --rm --network local \
-		-e DATABASE_URL="$$DATABASE_URL" \
+		-e DATABASE_URL="postgresql://$${POSTGRES_USER:-postgres}:$${POSTGRES_PASSWORD}@downloader-postgres:5432/$${POSTGRES_DB:-downloader}" \
 		-v $(PWD)/prisma:/app/prisma \
 		-w /app \
 		node:22-alpine sh -c "npx prisma@6 migrate deploy"
