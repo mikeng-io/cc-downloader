@@ -98,8 +98,9 @@ clean:
 
 # Database commands
 db-migrate:
+	@set -a && . ./.env.prod && set +a && \
 	docker run --rm --network local \
-		-e DATABASE_URL="$$(grep DATABASE_URL .env.prod | cut -d= -f2-)" \
+		-e DATABASE_URL="$$DATABASE_URL" \
 		-v $(PWD)/prisma:/app/prisma \
 		-w /app \
 		node:22-alpine sh -c "npx prisma@6 migrate deploy"
