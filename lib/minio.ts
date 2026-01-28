@@ -4,54 +4,72 @@ import { Readable } from "stream";
 import * as http from "http";
 import * as https from "https";
 
-const minioEndpoint = process.env.MINIO_ENDPOINT;
-const minioAccessKey = process.env.MINIO_ACCESS_KEY;
-const minioSecretKey = process.env.MINIO_SECRET_KEY;
-const minioBucket = process.env.MINIO_BUCKET ?? "downloads";
+// Lazy initialization to avoid build-time errors
+let minioClient: Client | null = null;
+let httpAgent: http.Agent | null = null;
+let httpsAgent: https.Agent | null = null;
+let minioBucket: string = "downloads";
 
-if (!minioEndpoint || !minioAccessKey || !minioSecretKey) {
-  throw new Error("Missing MinIO configuration");
+function getConfig() {
+  const minioEndpoint = process.env.MINIO_ENDPOINT;
+  const minioAccessKey = process.env.MINIO_ACCESS_KEY;
+  const minioSecretKey = process.env.MINIO_SECRET_KEY;
+  minioBucket = process.env.MINIO_BUCKET ?? "downloads";
+
+  if (!minioEndpoint || !minioAccessKey || !minioSecretKey) {
+    throw new Error("Missing MinIO configuration");
+  }
+
+  return { minioEndpoint, minioAccessKey, minioSecretKey };
 }
 
-// Configure HTTP agent for connection pooling
-const maxSockets = 50; // Maximum concurrent connections
-const keepAlive = true; // Enable keep-alive
+function getMinioClient(): Client {
+  if (!minioClient) {
+    const { minioEndpoint, minioAccessKey, minioSecretKey } = getConfig();
 
-const httpAgent = new http.Agent({
-  keepAlive,
-  maxSockets,
-  keepAliveMsecs: 1000, // Send keep-alive packets every 1 second
-});
+    // Configure HTTP agent for connection pooling
+    const maxSockets = 50;
+    const keepAlive = true;
 
-const httpsAgent = new https.Agent({
-  keepAlive,
-  maxSockets,
-  keepAliveMsecs: 1000,
-});
+    httpAgent = new http.Agent({
+      keepAlive,
+      maxSockets,
+      keepAliveMsecs: 1000,
+    });
 
-// MinIO client with connection pooling
-const clientOptions: ClientOptions = {
-  endPoint: new URL(minioEndpoint).hostname,
-  port: parseInt(new URL(minioEndpoint).port) || 9000,
-  useSSL: minioEndpoint.startsWith("https://"),
-  accessKey: minioAccessKey,
-  secretKey: minioSecretKey,
-};
+    httpsAgent = new https.Agent({
+      keepAlive,
+      maxSockets,
+      keepAliveMsecs: 1000,
+    });
 
-export const minioClient = new Client(clientOptions);
+    const clientOptions: ClientOptions = {
+      endPoint: new URL(minioEndpoint).hostname,
+      port: parseInt(new URL(minioEndpoint).port) || 9000,
+      useSSL: minioEndpoint.startsWith("https://"),
+      accessKey: minioAccessKey,
+      secretKey: minioSecretKey,
+    };
 
-// Apply connection pooling to the underlying HTTP agent
-// @ts-ignore - accessing internal transport for connection pooling
-if (minioClient.transport && minioClient.transport.agent) {
-  // @ts-ignore
-  minioClient.transport.agent = minioEndpoint.startsWith("https://") ? httpsAgent : httpAgent;
+    minioClient = new Client(clientOptions);
+
+    // Apply connection pooling to the underlying HTTP agent
+    // @ts-ignore - accessing internal transport for connection pooling
+    if (minioClient.transport && minioClient.transport.agent) {
+      // @ts-ignore
+      minioClient.transport.agent = minioEndpoint.startsWith("https://") ? httpsAgent : httpAgent;
+    }
+  }
+
+  return minioClient;
 }
 
 // Ensure bucket exists
 export async function ensureBucket() {
-  const exists = await minioClient.bucketExists(minioBucket);
+  const client = getMinioClient();
+  const exists = await client.bucketExists(minioBucket);
   if (!exists) {
-    await minioClient.makeBucket(minioBucket);
+    await client.makeBucket(minioBucket);
     console.log(`Bucket '${minioBucket}' created`);
   }
 }
@@ -70,7 +88,8 @@ export async function uploadFile(
   buffer: Buffer,
   metadata?: Record<string, string>
 ) {
-  await minioClient.putObject(minioBucket, storageKey, buffer, buffer.length, metadata || {});
+  const client = getMinioClient();
+  await client.putObject(minioBucket, storageKey, buffer, buffer.length, metadata || {});
 }
 
 /**
@@ -82,6 +101,7 @@ export async function uploadFileStream(
   metadata?: Record<string, string>,
   onProgress?: (bytesUploaded: number, totalBytes: number) => void
 ): Promise<{ etag: string; versionId?: string }> {
+  const client = getMinioClient();
   const stats = statSync(filePath);
   const fileSize = stats.size;
 
@@ -95,7 +115,7 @@ export async function uploadFileStream(
     onProgress?.(bytesUploaded, fileSize);
   });
 
-  const result = await minioClient.putObject(
+  const result = await client.putObject(
     minioBucket,
     storageKey,
     fileStream,
@@ -115,7 +135,8 @@ export async function uploadReadableStream(
   size: number,
   metadata?: Record<string, string>
 ): Promise<{ etag: string; versionId?: string }> {
-  const result = await minioClient.putObject(
+  const client = getMinioClient();
+  const result = await client.putObject(
     minioBucket,
     storageKey,
     stream,
@@ -128,21 +149,30 @@ export async function uploadReadableStream(
 
 // Generate presigned URL for download (reduced expiration for security)
 export async function getPresignedUrl(storageKey: string, expiresIn = 3600): Promise<string> {
-  return await minioClient.presignedGetObject(minioBucket, storageKey, expiresIn);
+  const client = getMinioClient();
+  return await client.presignedGetObject(minioBucket, storageKey, expiresIn);
 }
 
 // Delete file from MinIO
 export async function deleteFile(storageKey: string) {
-  await minioClient.removeObject(minioBucket, storageKey);
+  const client = getMinioClient();
+  await client.removeObject(minioBucket, storageKey);
 }
 
 // Get file stats
 export async function getFileStats(storageKey: string) {
-  return await minioClient.statObject(minioBucket, storageKey);
+  const client = getMinioClient();
+  return await client.statObject(minioBucket, storageKey);
+}
+
+// Get object stream for streaming files
+export async function getObjectStream(storageKey: string) {
+  const client = getMinioClient();
+  return await client.getObject(minioBucket, storageKey);
 }
 
 // Close connection pool (for graceful shutdown)
 export async function closeMinIOConnection() {
-  httpAgent.destroy();
-  httpsAgent.destroy();
+  httpAgent?.destroy();
+  httpsAgent?.destroy();
 }

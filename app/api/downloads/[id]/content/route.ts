@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { minioClient, getFileStats } from "@/lib/minio";
+import { getFileStats, getObjectStream } from "@/lib/minio";
 import { DownloadStatus } from "@prisma/client";
 import { createApiSpan } from "@/lib/otel";
 
-const MINIO_BUCKET = process.env.MINIO_BUCKET ?? "downloads";
 
 /**
  * Stream video/audio files from MinIO with Range request support
@@ -70,7 +69,7 @@ export async function GET(
       // For Range requests, we need to get a partial stream
       // MinIO doesn't support range in getObject, so we'll skip bytes for now
       // TODO: Implement proper range skipping for large video seeking
-      const stream = await minioClient.getObject(MINIO_BUCKET, download.storagePath);
+      const stream = await getObjectStream(download.storagePath);
 
       // Create a readable stream wrapper
       const readableStream = new ReadableStream({
