@@ -203,7 +203,7 @@ export function ImagePreviewModal({
             </div>
 
             {/* Media container */}
-            <div className="flex items-center justify-center bg-gray-100 dark:bg-gray-800 min-h-[50vh] sm:min-h-[300px]">
+            <div className="flex items-center justify-center bg-gray-100 dark:bg-gray-800 min-h-[50vh] p-4 sm:min-h-[300px] sm:p-6">
               {error ? (
                 <div className="text-center p-8">
                   <span className="material-symbols-outlined text-5xl text-gray-400 mb-2">error</span>
@@ -216,9 +216,8 @@ export function ImagePreviewModal({
                   controls
                   playsInline
                   preload="metadata"
-                  className="h-full w-full object-contain sm:max-h-[calc(90vh-120px)] sm:max-w-full"
+                  className="max-h-[calc(100vh-180px)] w-full object-contain sm:max-h-[calc(90vh-180px)] sm:max-w-full"
                   onError={() => setError(true)}
-                  style={{ maxHeight: 'calc(100vh - 120px)' }}
                 >
                   Your browser does not support video playback.
                 </video>
@@ -241,8 +240,7 @@ export function ImagePreviewModal({
                   key={imageUrl}
                   src={imageUrl}
                   alt={fileName}
-                  className="h-full w-full object-contain sm:max-h-[calc(90vh-120px)] sm:max-w-full"
-                  style={{ maxHeight: 'calc(100vh - 120px)' }}
+                  className="max-h-[calc(100vh-180px)] max-w-full object-contain sm:max-h-[calc(90vh-180px)]"
                   onError={() => setError(true)}
                 />
               ) : (
