@@ -7,6 +7,41 @@ const nextConfig: NextConfig = {
   /* config options here */
   async headers() {
     return [
+      // Static assets - cache aggressively
+      {
+        source: "/_next/static/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
+        ],
+      },
+      // Images - cache for 1 year
+      {
+        source: "/images/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
+        ],
+      },
+      // API routes - no cache
+      {
+        source: "/api/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "no-store, no-cache, must-revalidate, proxy-revalidate",
+          },
+          {
+            key: "CDN-Cache-Control",
+            value: "no-store",
+          },
+        ],
+      },
+      // All other routes - security + minimal cache
       {
         source: "/:path*",
         headers: [
