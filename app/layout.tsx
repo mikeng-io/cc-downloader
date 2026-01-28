@@ -18,10 +18,10 @@ export default function RootLayout({
       <head>
         {/* Material Symbols font is now self-hosted via globals.css */}
       </head>
-      <body className="antialiased">
+      <body className="min-h-screen bg-background text-foreground antialiased">
         <ThemeProvider>
           <Navbar />
-          <main>{children}</main>
+          {children}
         </ThemeProvider>
       </body>
     </html>

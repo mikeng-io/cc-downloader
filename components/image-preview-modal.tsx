@@ -131,7 +131,7 @@ export function ImagePreviewModal({
                 e.stopPropagation();
                 onPrevious();
               }}
-              className="absolute left-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/90 p-3 text-gray-900 shadow-lg transition-all hover:bg-white hover:scale-110 active:scale-95 sm:left-4 sm:p-4"
+              className="absolute left-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/90 p-3 text-gray-900 shadow-lg transition-all hover:bg-white hover:scale-110 active:scale-95 dark:bg-gray-800/90 dark:text-white dark:hover:bg-gray-800 sm:left-4 sm:p-4"
               aria-label="Previous"
             >
               <span className="material-symbols-outlined text-2xl sm:text-3xl">chevron_left</span>
@@ -145,7 +145,7 @@ export function ImagePreviewModal({
                 e.stopPropagation();
                 onNext();
               }}
-              className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/90 p-3 text-gray-900 shadow-lg transition-all hover:bg-white hover:scale-110 active:scale-95 sm:right-4 sm:p-4"
+              className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/90 p-3 text-gray-900 shadow-lg transition-all hover:bg-white hover:scale-110 active:scale-95 dark:bg-gray-800/90 dark:text-white dark:hover:bg-gray-800 sm:right-4 sm:p-4"
               aria-label="Next"
             >
               <span className="material-symbols-outlined text-2xl sm:text-3xl">chevron_right</span>
