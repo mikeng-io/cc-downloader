@@ -1,6 +1,17 @@
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Lazy initialization to avoid build-time errors
+let resend: Resend | null = null;
+
+function getResend(): Resend {
+  if (!resend) {
+    if (!process.env.RESEND_API_KEY) {
+      throw new Error("RESEND_API_KEY environment variable is not set");
+    }
+    resend = new Resend(process.env.RESEND_API_KEY);
+  }
+  return resend;
+}
 
 // Allowed email domains for registration
 export const ALLOWED_EMAIL_DOMAINS = ["mikeng.io", "nortrix.io"];
@@ -29,7 +40,7 @@ export async function sendVerificationEmail(
   name?: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const { error } = await resend.emails.send({
+    const { error } = await getResend().emails.send({
       from: process.env.EMAIL_FROM || "Downloader <noreply@nortrix.io>",
       to: email,
       subject: "Verify your Downloader account",
