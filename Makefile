@@ -98,7 +98,11 @@ clean:
 
 # Database commands
 db-migrate:
-	docker exec downloader-web ./node_modules/.bin/prisma migrate deploy
+	docker run --rm --network local \
+		-e DATABASE_URL="$$(grep DATABASE_URL .env.prod | cut -d= -f2-)" \
+		-v $(PWD)/prisma:/app/prisma \
+		-w /app \
+		node:22-alpine sh -c "npx prisma@6 migrate deploy"
 
 db-shell:
 	@. .env.prod 2>/dev/null && docker exec -it downloader-postgres psql -U $${POSTGRES_USER:-postgres} -d $${POSTGRES_DB:-downloader}
