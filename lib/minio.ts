@@ -165,10 +165,28 @@ export async function getFileStats(storageKey: string) {
   return await client.statObject(minioBucket, storageKey);
 }
 
-// Get object stream for streaming files
+// Get object stream for streaming files (full file)
 export async function getObjectStream(storageKey: string) {
   const client = getMinioClient();
   return await client.getObject(minioBucket, storageKey);
+}
+
+/**
+ * Get partial object stream for efficient range requests (video seeking)
+ * This is MUCH more efficient than downloading the full file and slicing
+ *
+ * @param storageKey - The object key in MinIO
+ * @param offset - Start byte position
+ * @param length - Number of bytes to fetch
+ * @returns Readable stream of the requested byte range
+ */
+export async function getPartialObjectStream(
+  storageKey: string,
+  offset: number,
+  length: number
+) {
+  const client = getMinioClient();
+  return await client.getPartialObject(minioBucket, storageKey, offset, length);
 }
 
 // Close connection pool (for graceful shutdown)

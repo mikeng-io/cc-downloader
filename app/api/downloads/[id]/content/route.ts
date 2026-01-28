@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getFileStats, getObjectStream } from "@/lib/minio";
+import { getFileStats, getObjectStream, getPartialObjectStream } from "@/lib/minio";
 import { DownloadStatus } from "@prisma/client";
 import { createApiSpan } from "@/lib/otel";
 
@@ -19,6 +19,65 @@ export async function OPTIONS(): Promise<NextResponse> {
       "Access-Control-Max-Age": "86400",
     },
   });
+}
+
+/**
+ * HEAD request for video players to get file metadata without downloading
+ * This is called before actual streaming to determine file size
+ */
+export async function HEAD(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+): Promise<NextResponse> {
+  const { id } = await params;
+
+  const session = await auth();
+  if (!session?.user?.id) {
+    return new NextResponse(null, { status: 401 });
+  }
+
+  try {
+    const download = await prisma.download.findUnique({
+      where: { id },
+    });
+
+    if (!download || download.userId !== session.user.id) {
+      return new NextResponse(null, { status: 404 });
+    }
+
+    if (download.status !== DownloadStatus.COMPLETED || !download.storagePath) {
+      return new NextResponse(null, { status: 400 });
+    }
+
+    const stats = await getFileStats(download.storagePath);
+
+    const contentTypeMap: Record<string, string> = {
+      VIDEO_MP4: "video/mp4",
+      VIDEO_WEBM: "video/webm",
+      AUDIO_MP3: "audio/mpeg",
+      AUDIO_M4A: "audio/mp4",
+      AUDIO_WAV: "audio/wav",
+      IMAGE_JPEG: "image/jpeg",
+      IMAGE_PNG: "image/png",
+      IMAGE_GIF: "image/gif",
+      IMAGE_WEBP: "image/webp",
+      UNKNOWN: "application/octet-stream",
+    };
+
+    return new NextResponse(null, {
+      status: 200,
+      headers: {
+        "Content-Type": contentTypeMap[download.mimeType] || "application/octet-stream",
+        "Content-Length": stats.size.toString(),
+        "Accept-Ranges": "bytes",
+        "Cache-Control": "private, max-age=3600",
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
+  } catch (error) {
+    console.error("HEAD error:", error);
+    return new NextResponse(null, { status: 500 });
+  }
 }
 
 /**
@@ -81,45 +140,17 @@ export async function GET(
       const contentLength = end - start + 1;
       const isPartial = rangeHeader !== null;
 
-      // Get stream from MinIO
-      const stream = await getObjectStream(download.storagePath);
+      // Use native MinIO range requests for efficiency
+      // This only fetches the requested bytes, not the entire file
+      const stream = isPartial
+        ? await getPartialObjectStream(download.storagePath, start, contentLength)
+        : await getObjectStream(download.storagePath);
 
-      // Create a readable stream wrapper with range support
-      let bytesRead = 0;
+      // Create a readable stream wrapper
       const readableStream = new ReadableStream({
         start(controller) {
           stream.on("data", (chunk: Buffer) => {
-            const chunkEnd = bytesRead + chunk.length;
-
-            // Skip bytes before range start
-            if (chunkEnd <= start) {
-              bytesRead = chunkEnd;
-              return;
-            }
-
-            // Stop after range end
-            if (bytesRead > end) {
-              stream.destroy();
-              controller.close();
-              return;
-            }
-
-            // Handle partial chunk at start of range
-            let startOffset = 0;
-            if (bytesRead < start) {
-              startOffset = start - bytesRead;
-            }
-
-            // Handle partial chunk at end of range
-            let endOffset = chunk.length;
-            if (chunkEnd > end + 1) {
-              endOffset = chunk.length - (chunkEnd - end - 1);
-            }
-
-            const slicedChunk = chunk.slice(startOffset, endOffset);
-            bytesRead = chunkEnd;
-
-            controller.enqueue(new Uint8Array(slicedChunk));
+            controller.enqueue(new Uint8Array(chunk));
           });
           stream.on("end", () => {
             controller.close();
