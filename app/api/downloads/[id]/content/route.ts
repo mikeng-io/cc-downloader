@@ -154,7 +154,9 @@ export async function GET(
         "Content-Type": contentType,
         "Content-Length": contentLength.toString(),
         "Accept-Ranges": "bytes",
-        "Cache-Control": "no-cache",
+        // Cache in browser only (not CDN) for 1 hour - faster repeat views, but secure
+        "Cache-Control": "private, max-age=3600",
+        "CDN-Cache-Control": "no-store",
         "Content-Disposition": `inline; filename="${download.fileName || "download"}"`,
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
