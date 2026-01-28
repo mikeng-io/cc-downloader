@@ -1,5 +1,5 @@
 import { Queue, Worker, Job } from "bullmq";
-import { redis } from "./redis";
+import { getRedis } from "./redis";
 import { prisma } from "./prisma";
 import { DownloadStatus, MimeType } from "@prisma/client";
 import { handleYtdlpDownload, handleGalleryDlDownload } from "./workers/ytdlp-worker";
@@ -65,23 +65,31 @@ export function classifyError(error: Error | string): {
   };
 }
 
-export const downloadQueue = new Queue<DownloadJobData>("downloads", {
-  connection: redis,
-  defaultJobOptions: {
-    attempts: 3,
-    backoff: {
-      type: "exponential",
-      delay: 2000,
-    },
-    removeOnComplete: {
-      age: 24 * 3600, // 24 hours
-      count: 1000,
-    },
-    removeOnFail: {
-      age: 7 * 24 * 3600, // 7 days
-    },
-  },
-});
+// Lazy initialization for queue
+let downloadQueue: Queue<DownloadJobData> | null = null;
+
+export function getDownloadQueue(): Queue<DownloadJobData> {
+  if (!downloadQueue) {
+    downloadQueue = new Queue<DownloadJobData>("downloads", {
+      connection: getRedis(),
+      defaultJobOptions: {
+        attempts: 3,
+        backoff: {
+          type: "exponential",
+          delay: 2000,
+        },
+        removeOnComplete: {
+          age: 24 * 3600, // 24 hours
+          count: 1000,
+        },
+        removeOnFail: {
+          age: 7 * 24 * 3600, // 7 days
+        },
+      },
+    });
+  }
+  return downloadQueue;
+}
 
 // Worker configuration with retry tracking
 export function createWorker() {
@@ -150,7 +158,7 @@ export function createWorker() {
       }
     },
     {
-      connection: redis,
+      connection: getRedis(),
       concurrency: 3,
     }
   );
@@ -372,7 +380,8 @@ function getMimeTypeFromContentType(contentType: string | null): MimeType {
 
 // Add download job to queue
 export async function addDownloadJob(data: DownloadJobData) {
-  return await downloadQueue.add("download", data, {
+  const queue = getDownloadQueue();
+  return await queue.add("download", data, {
     jobId: data.downloadId,
     priority: 0,
   });
@@ -380,7 +389,8 @@ export async function addDownloadJob(data: DownloadJobData) {
 
 // Cancel download job
 export async function cancelDownloadJob(downloadId: string) {
-  const job = await downloadQueue.getJob(downloadId);
+  const queue = getDownloadQueue();
+  const job = await queue.getJob(downloadId);
   if (job) {
     await job.remove();
     await prisma.download.update({

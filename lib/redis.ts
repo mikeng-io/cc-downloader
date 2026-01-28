@@ -1,27 +1,36 @@
 import { Redis } from "ioredis";
 
-const getRedisUrl = () => {
-  if (process.env.REDIS_URL) {
-    return process.env.REDIS_URL;
-  }
-  throw new Error("REDIS_URL is not defined");
-};
+// Lazy initialization to avoid build-time errors
+let redis: Redis | null = null;
 
-export const redis = new Redis(getRedisUrl(), {
-  maxRetriesPerRequest: null, // Required by BullMQ
-  retryStrategy: (times) => {
-    if (times > 3) {
-      return null;
+export function getRedis(): Redis {
+  if (!redis) {
+    if (!process.env.REDIS_URL) {
+      throw new Error("REDIS_URL is not defined");
     }
-    return Math.min(times * 100, 3000);
-  },
-});
 
-// Graceful shutdown
-process.on("SIGTERM", () => {
-  redis.quit();
-});
+    redis = new Redis(process.env.REDIS_URL, {
+      maxRetriesPerRequest: null, // Required by BullMQ
+      retryStrategy: (times) => {
+        if (times > 3) {
+          return null;
+        }
+        return Math.min(times * 100, 3000);
+      },
+    });
 
-process.on("SIGINT", () => {
-  redis.quit();
-});
+    // Graceful shutdown
+    process.on("SIGTERM", () => {
+      redis?.quit();
+    });
+
+    process.on("SIGINT", () => {
+      redis?.quit();
+    });
+  }
+
+  return redis;
+}
+
+// For backwards compatibility - but this should only be used at runtime
+export { redis };

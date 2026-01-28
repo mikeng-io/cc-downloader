@@ -1,4 +1,4 @@
-import { redis } from "@/lib/redis";
+import { getRedis } from "@/lib/redis";
 
 /**
  * Rate limiter using Redis (shared with BullMQ)
@@ -59,6 +59,8 @@ export async function checkRateLimit(
   const redisKey = `ratelimit:${key}:${identifier}:${windowStart}`;
 
   try {
+    const redis = getRedis();
+
     // Increment counter
     const current = await redis.incr(redisKey);
 
