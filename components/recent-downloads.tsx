@@ -61,6 +61,16 @@ export function RecentDownloads() {
 
   useEffect(() => {
     fetchDownloads();
+
+    // Only poll if there are active downloads
+    const hasActiveDownloads = downloads.some(
+      (d) => d.status === "PENDING" || d.status === "PROCESSING"
+    );
+
+    if (!hasActiveDownloads) {
+      return; // Don't set up polling
+    }
+
     const interval = setInterval(() => {
       if (document.visibilityState === "visible") {
         fetchDownloads();
@@ -79,7 +89,7 @@ export function RecentDownloads() {
       clearInterval(interval);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [fetchDownloads]);
+  }, [fetchDownloads, downloads]);
 
   const handleDelete = async (downloadId: string) => {
     if (!confirm("Delete this download?")) return;

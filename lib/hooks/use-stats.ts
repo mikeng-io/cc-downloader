@@ -59,6 +59,13 @@ export function useStats(): UseStatsReturn {
     // Initial fetch
     fetchStats();
 
+    // Only poll if there are active downloads
+    const hasActiveDownloads = stats && (stats.processing > 0 || stats.pending > 0);
+
+    if (!hasActiveDownloads) {
+      return; // Don't set up polling
+    }
+
     // Set up polling interval
     const interval = setInterval(() => {
       // Only poll if document is visible (tab is active)
@@ -81,7 +88,7 @@ export function useStats(): UseStatsReturn {
       clearInterval(interval);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [fetchStats]);
+  }, [fetchStats, stats]);
 
   return {
     stats,

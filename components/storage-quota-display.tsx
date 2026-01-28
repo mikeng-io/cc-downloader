@@ -42,11 +42,10 @@ export function StorageQuotaDisplay({ className = "" }: StorageQuotaDisplayProps
   const [showTooltip, setShowTooltip] = useState(false);
 
   useEffect(() => {
+    // Fetch quota once on mount
     fetchQuota();
-    // Refresh quota every 30 seconds
-    const interval = setInterval(fetchQuota, 30000);
 
-    // Pause polling when not visible
+    // Refresh when tab becomes visible again (user returns)
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
         fetchQuota();
@@ -56,7 +55,6 @@ export function StorageQuotaDisplay({ className = "" }: StorageQuotaDisplayProps
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
-      clearInterval(interval);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, []);
