@@ -235,7 +235,7 @@ test.describe("API Documentation", () => {
     await page.goto("http://localhost:3000/docs");
 
     // Wait for Scalar to load
-    await page.waitForSelector('h1, [data-sectional="title"]', .scalar-title', .api-reference',
+    await page.waitForSelector('h1, [data-sectional="title"], .scalar-title, .api-reference',
       { timeout: 15000 }
     );
 

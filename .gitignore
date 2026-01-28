@@ -62,3 +62,4 @@ prisma/migrations/*/migration.sql
 # Production env files
 .env.prod
 .env.traefik
+*.backup
