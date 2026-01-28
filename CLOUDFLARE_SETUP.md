@@ -26,13 +26,15 @@ Create these Cache Rules in Cloudflare Dashboard → Caching → Cache Rules:
 - **Then**:
   - Cache eligibility: Bypass cache
 
-#### Rule 3: Bypass Cache for Downloads
+#### Rule 3: Bypass Cache for Download Content
 - **When incoming requests match**: Custom filter expression
   ```
-  http.request.uri.path contains "/downloads/" and http.request.uri.path contains "/content"
+  http.request.uri.path matches "/api/downloads/.*/content"
   ```
 - **Then**:
   - Cache eligibility: Bypass cache
+
+**Note**: Download content URLs follow pattern: `/api/downloads/{id}/content`
 
 ### 2. Page Rules (Alternative if Cache Rules not available)
 
@@ -105,7 +107,7 @@ Consider adding:
 ### What NOT to Cache
 ❌ `/api/*` - API routes (especially authenticated)
 ❌ `/auth/*` - Authentication pages
-❌ `/downloads/*/content` - User download files
+❌ `/api/downloads/*/content` - User download files (requires Range request support for iOS)
 ❌ Pages with user-specific content
 
 ### Testing Cache

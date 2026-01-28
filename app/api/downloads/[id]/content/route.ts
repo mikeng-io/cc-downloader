@@ -7,8 +7,23 @@ import { createApiSpan } from "@/lib/otel";
 
 
 /**
+ * Handle CORS preflight requests
+ */
+export async function OPTIONS(): Promise<NextResponse> {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+      "Access-Control-Allow-Headers": "Range, Content-Type",
+      "Access-Control-Max-Age": "86400",
+    },
+  });
+}
+
+/**
  * Stream video/audio files from MinIO with Range request support
- * Supports seeking for video players
+ * Supports seeking for video players (required for iOS Safari)
  */
 export async function GET(
   request: NextRequest,
@@ -66,21 +81,51 @@ export async function GET(
       const contentLength = end - start + 1;
       const isPartial = rangeHeader !== null;
 
-      // For Range requests, we need to get a partial stream
-      // MinIO doesn't support range in getObject, so we'll skip bytes for now
-      // TODO: Implement proper range skipping for large video seeking
+      // Get stream from MinIO
       const stream = await getObjectStream(download.storagePath);
 
-      // Create a readable stream wrapper
+      // Create a readable stream wrapper with range support
+      let bytesRead = 0;
       const readableStream = new ReadableStream({
         start(controller) {
           stream.on("data", (chunk: Buffer) => {
-            controller.enqueue(new Uint8Array(chunk));
+            const chunkEnd = bytesRead + chunk.length;
+
+            // Skip bytes before range start
+            if (chunkEnd <= start) {
+              bytesRead = chunkEnd;
+              return;
+            }
+
+            // Stop after range end
+            if (bytesRead > end) {
+              stream.destroy();
+              controller.close();
+              return;
+            }
+
+            // Handle partial chunk at start of range
+            let startOffset = 0;
+            if (bytesRead < start) {
+              startOffset = start - bytesRead;
+            }
+
+            // Handle partial chunk at end of range
+            let endOffset = chunk.length;
+            if (chunkEnd > end + 1) {
+              endOffset = chunk.length - (chunkEnd - end - 1);
+            }
+
+            const slicedChunk = chunk.slice(startOffset, endOffset);
+            bytesRead = chunkEnd;
+
+            controller.enqueue(new Uint8Array(slicedChunk));
           });
           stream.on("end", () => {
             controller.close();
           });
           stream.on("error", (err) => {
+            console.error("Stream error:", err);
             controller.error(err);
           });
         },
@@ -107,9 +152,9 @@ export async function GET(
 
       const headers = new Headers({
         "Content-Type": contentType,
-        "Content-Length": fileSize.toString(),
+        "Content-Length": contentLength.toString(),
         "Accept-Ranges": "bytes",
-        "Cache-Control": "public, max-age=31536000",
+        "Cache-Control": "no-cache",
         "Content-Disposition": `inline; filename="${download.fileName || "download"}"`,
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
@@ -117,7 +162,7 @@ export async function GET(
       });
 
       if (isPartial) {
-        headers.set("Content-Range", `bytes 0-${fileSize - 1}/${fileSize}`);
+        headers.set("Content-Range", `bytes ${start}-${end}/${fileSize}`);
       }
 
       return new NextResponse(readableStream, {
