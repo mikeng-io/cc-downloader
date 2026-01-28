@@ -38,7 +38,11 @@ export function RecentDownloads() {
   const [downloads, setDownloads] = useState<Download[]>([]);
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState<DownloadsResponse["pagination"] | null>(null);
-  const [previewDownload, setPreviewDownload] = useState<Download | null>(null);
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
+
+  // Get completed downloads for preview navigation
+  const completedDownloads = downloads.filter((d) => d.status === "COMPLETED");
+  const previewDownload = previewIndex !== null ? completedDownloads[previewIndex] : null;
 
   const fetchDownloads = useCallback(async () => {
     try {
@@ -210,7 +214,10 @@ export function RecentDownloads() {
                     {download.status === "COMPLETED" && (
                       <>
                         <button
-                          onClick={() => setPreviewDownload(download)}
+                          onClick={() => {
+                            const idx = completedDownloads.findIndex((d) => d.id === download.id);
+                            setPreviewIndex(idx >= 0 ? idx : null);
+                          }}
                           className="rounded px-2 py-1 text-sm text-primary hover:bg-primary/10"
                         >
                           View
@@ -249,14 +256,20 @@ export function RecentDownloads() {
       )}
 
       {/* Preview Modal */}
-      {previewDownload && (
+      {previewDownload && previewIndex !== null && (
         <ImagePreviewModal
           isOpen={!!previewDownload}
-          onClose={() => setPreviewDownload(null)}
+          onClose={() => setPreviewIndex(null)}
           imageUrl={`/api/downloads/${previewDownload.id}/content`}
           fileName={previewDownload.fileName || "Unknown"}
           fileSize={previewDownload.fileSize}
           downloadUrl={`/api/downloads/${previewDownload.id}/content`}
+          onPrevious={() => setPreviewIndex((prev) => (prev !== null && prev > 0 ? prev - 1 : prev))}
+          onNext={() => setPreviewIndex((prev) => (prev !== null && prev < completedDownloads.length - 1 ? prev + 1 : prev))}
+          hasPrevious={previewIndex > 0}
+          hasNext={previewIndex < completedDownloads.length - 1}
+          currentIndex={previewIndex}
+          totalCount={completedDownloads.length}
         />
       )}
     </div>
