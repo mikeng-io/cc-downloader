@@ -1,8 +1,13 @@
 .PHONY: help network traefik traefik-down app app-down deploy deploy-down logs logs-traefik logs-app build clean
 
+# Detect docker compose command (V2 plugin vs standalone)
+DOCKER_COMPOSE := $(shell docker compose version >/dev/null 2>&1 && echo "docker compose" || echo "docker-compose")
+
 # Default target
 help:
 	@echo "Downloader Deployment Commands"
+	@echo ""
+	@echo "Using: $(DOCKER_COMPOSE)"
 	@echo ""
 	@echo "Setup:"
 	@echo "  make network        - Create the 'local' Docker network"
@@ -39,14 +44,14 @@ traefik: network
 		echo "Error: .env.traefik not found. Copy .env.traefik.example to .env.traefik and configure it."; \
 		exit 1; \
 	fi
-	docker-compose -f docker-compose.traefik.yml --env-file .env.traefik up -d
+	$(DOCKER_COMPOSE) -f docker-compose.traefik.yml --env-file .env.traefik up -d
 	@echo "Traefik is running"
 
 traefik-down:
-	docker-compose -f docker-compose.traefik.yml --env-file .env.traefik down
+	$(DOCKER_COMPOSE) -f docker-compose.traefik.yml --env-file .env.traefik down
 
 logs-traefik:
-	docker-compose -f docker-compose.traefik.yml --env-file .env.traefik logs -f
+	$(DOCKER_COMPOSE) -f docker-compose.traefik.yml --env-file .env.traefik logs -f
 
 # Application commands
 app: network
@@ -54,17 +59,17 @@ app: network
 		echo "Error: .env.prod not found. Copy .env.prod.example to .env.prod and configure it."; \
 		exit 1; \
 	fi
-	docker-compose -f docker-compose.prod.yml --env-file .env.prod up -d
+	$(DOCKER_COMPOSE) -f docker-compose.prod.yml --env-file .env.prod up -d
 	@echo "Application is running"
 
 app-down:
-	docker-compose -f docker-compose.prod.yml --env-file .env.prod down
+	$(DOCKER_COMPOSE) -f docker-compose.prod.yml --env-file .env.prod down
 
 logs-app:
-	docker-compose -f docker-compose.prod.yml --env-file .env.prod logs -f
+	$(DOCKER_COMPOSE) -f docker-compose.prod.yml --env-file .env.prod logs -f
 
 build:
-	docker-compose -f docker-compose.prod.yml --env-file .env.prod build --no-cache
+	$(DOCKER_COMPOSE) -f docker-compose.prod.yml --env-file .env.prod build --no-cache
 
 # All-in-one commands
 deploy: traefik app
@@ -87,8 +92,8 @@ logs:
 clean:
 	@echo "Warning: This will remove all containers and volumes!"
 	@read -p "Are you sure? [y/N] " confirm && [ "$$confirm" = "y" ] || exit 1
-	docker-compose -f docker-compose.prod.yml --env-file .env.prod down -v 2>/dev/null || true
-	docker-compose -f docker-compose.traefik.yml --env-file .env.traefik down -v 2>/dev/null || true
+	$(DOCKER_COMPOSE) -f docker-compose.prod.yml --env-file .env.prod down -v 2>/dev/null || true
+	$(DOCKER_COMPOSE) -f docker-compose.traefik.yml --env-file .env.traefik down -v 2>/dev/null || true
 	@echo "Cleaned up"
 
 # Database commands
