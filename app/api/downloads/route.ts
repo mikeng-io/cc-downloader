@@ -173,6 +173,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       const serializedDownloads = downloads.map((download) => ({
         ...download,
         fileSize: download.fileSize?.toString() || null,
+        mimeType: download.mimeType,
+        thumbnailPath: download.thumbnailPath ?? null,
         progress: download.progress ? {
           ...download.progress,
           bytesDownloaded: download.progress.bytesDownloaded?.toString() || "0",
