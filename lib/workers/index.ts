@@ -2,17 +2,19 @@
 require("dotenv").config();
 
 const { createWorker } = require("../queue");
+const { createThumbnailWorker } = require("./thumbnail-worker");
 
-console.log("Starting download worker...");
+console.log("Starting workers...");
 
-const worker = createWorker();
+const downloadWorker = createWorker();
+const thumbnailWorker = createThumbnailWorker();
 
-console.log("Worker ready, waiting for jobs...");
+console.log("Workers ready, waiting for jobs...");
 
 // Handle shutdown
 async function shutdown() {
-  console.log("Shutting down worker...");
-  await worker.close();
+  console.log("Shutting down workers...");
+  await Promise.all([downloadWorker.close(), thumbnailWorker.close()]);
   process.exit(0);
 }
 
