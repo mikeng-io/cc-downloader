@@ -5,6 +5,7 @@ import { DownloadStatus, MimeType } from "@prisma/client";
 import { handleYtdlpDownload, handleGalleryDlDownload } from "./workers/ytdlp-worker";
 import { ensureBucket, generateStorageKey, uploadFile } from "./minio";
 import { getExtensionFromMimeType } from "./mime-types";
+import { generateAndUploadThumbnailFromBuffer } from "./thumbnail";
 
 // Job types
 export interface DownloadJobData {
@@ -254,6 +255,14 @@ async function handleDirectDownload(job: Job<DownloadJobData>) {
     "downloaded-from": url,
   });
 
+  // Generate thumbnail (does not fail the download on error)
+  const thumbnailKey = await generateAndUploadThumbnailFromBuffer(
+    buffer,
+    getMimeTypeFromContentType(contentType),
+    userId,
+    downloadId,
+  );
+
   // Update database
   updateProgress(95);
   await prisma.download.update({
@@ -264,6 +273,7 @@ async function handleDirectDownload(job: Job<DownloadJobData>) {
       fileSize: BigInt(buffer.length),
       mimeType: getMimeTypeFromContentType(contentType),
       storagePath: storageKey,
+      thumbnailPath: thumbnailKey,
       completedAt: new Date(),
       metadata: {
         extractor: "direct",
