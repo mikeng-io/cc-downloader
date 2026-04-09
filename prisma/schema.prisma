@@ -128,6 +128,7 @@ model Download {
 
   // Storage
   storagePath   String?       @db.Text
+  thumbnailPath String?       @db.Text
 
   // Agent-specific metadata (flexible)
   metadata      Json?
