@@ -177,25 +177,24 @@ describe("thumbnail worker processor", () => {
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 
-  it("does not throw when generateAndUploadThumbnailFromBuffer throws", async () => {
+  it("rethrows when generateAndUploadThumbnailFromBuffer throws (enables BullMQ retry)", async () => {
     const processor = getProcessor();
     mockFindUnique.mockResolvedValue({ thumbnailPath: null });
 
     mockGetObjectStream.mockResolvedValue(makeReadable(Buffer.from("data")));
     mockGenerateThumbnail.mockRejectedValue(new Error("ffmpeg crash"));
 
-    // Should resolve without throwing
-    await expect(processor(makeJob())).resolves.toBeUndefined();
+    await expect(processor(makeJob())).rejects.toThrow("ffmpeg crash");
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 
-  it("does not throw when getObjectStream throws", async () => {
+  it("rethrows when getObjectStream throws (enables BullMQ retry)", async () => {
     const processor = getProcessor();
     mockFindUnique.mockResolvedValue({ thumbnailPath: null });
 
     mockGetObjectStream.mockRejectedValue(new Error("MinIO unavailable"));
 
-    await expect(processor(makeJob())).resolves.toBeUndefined();
+    await expect(processor(makeJob())).rejects.toThrow("MinIO unavailable");
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 });
