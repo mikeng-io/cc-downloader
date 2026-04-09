@@ -21,10 +21,10 @@ export function createThumbnailWorker() {
     async (job: Job<ThumbnailJobData>) => {
       const { downloadId, userId, storagePath, mimeType } = job.data;
 
-      // Check if the download still needs a thumbnail
+      // Check if the download still needs a thumbnail or sprite
       const download = await prisma.download.findUnique({
         where: { id: downloadId },
-        select: { thumbnailPath: true, fileSize: true },
+        select: { thumbnailPath: true, spritePath: true, fileSize: true },
       });
 
       if (!download) {
@@ -32,8 +32,8 @@ export function createThumbnailWorker() {
         return;
       }
 
-      if (download?.thumbnailPath) {
-        console.log(`[thumbnail-worker] Skipping ${downloadId} — thumbnail already set`);
+      if (download.thumbnailPath && download.spritePath) {
+        console.log(`[thumbnail-worker] Skipping ${downloadId} — thumbnail and sprite already set`);
         return;
       }
 
@@ -53,38 +53,26 @@ export function createThumbnailWorker() {
       const stream = await getObjectStream(storagePath);
       const buffer = await streamToBuffer(stream);
 
-      // Generate and upload thumbnail (throws on ffmpeg crash or upload failure)
-      const key = await generateAndUploadThumbnailFromBuffer(
-        buffer,
-        mimeType as MimeType,
-        userId,
-        downloadId
-      );
+      // Generate thumbnail if not already set
+      const key = download.thumbnailPath
+        ? download.thumbnailPath
+        : await generateAndUploadThumbnailFromBuffer(buffer, mimeType as MimeType, userId, downloadId);
 
-      // Generate sprite sheet for videos (non-blocking)
-      const spriteKey = await generateAndUploadSpriteSheetFromBuffer(
-        buffer,
-        mimeType as MimeType,
-        userId,
-        downloadId,
-      );
+      // Generate sprite sheet if not already set
+      const spriteKey = download.spritePath
+        ? download.spritePath
+        : await generateAndUploadSpriteSheetFromBuffer(buffer, mimeType as MimeType, userId, downloadId);
 
-      if (key !== null || spriteKey !== null) {
-        await prisma.download.update({
-          where: { id: downloadId },
-          data: {
-            ...(key !== null ? { thumbnailPath: key } : {}),
-            ...(spriteKey !== null ? { spritePath: spriteKey } : {}),
-          },
-        });
-        if (key !== null) {
-          console.log(`[thumbnail-worker] Thumbnail generated for ${downloadId}: ${key}`);
-        }
-        if (spriteKey !== null) {
-          console.log(`[thumbnail-worker] Sprite sheet generated for ${downloadId}: ${spriteKey}`);
-        }
+      const updates: Record<string, string> = {};
+      if (key !== null && !download.thumbnailPath) updates.thumbnailPath = key;
+      if (spriteKey !== null && !download.spritePath) updates.spritePath = spriteKey;
+
+      if (Object.keys(updates).length > 0) {
+        await prisma.download.update({ where: { id: downloadId }, data: updates });
+        if (updates.thumbnailPath) console.log(`[thumbnail-worker] Thumbnail generated for ${downloadId}: ${key}`);
+        if (updates.spritePath) console.log(`[thumbnail-worker] Sprite sheet generated for ${downloadId}: ${spriteKey}`);
       } else {
-        console.log(`[thumbnail-worker] No thumbnail generated for ${downloadId} (unsupported type or error)`);
+        console.log(`[thumbnail-worker] No new assets generated for ${downloadId}`);
       }
     },
     {
