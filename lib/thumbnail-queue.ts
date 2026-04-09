@@ -18,7 +18,7 @@ export function getThumbnailQueue(): Queue<ThumbnailJobData> {
         attempts: 2,
         backoff: { type: "exponential", delay: 3000 },
         removeOnComplete: { age: 24 * 3600, count: 500 },
-        removeOnFail: { age: 7 * 24 * 3600 },
+        removeOnFail: { age: 7 * 24 * 3600, count: 1000 },
       },
     });
   }

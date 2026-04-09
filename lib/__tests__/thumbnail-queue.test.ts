@@ -120,6 +120,17 @@ describe("thumbnail worker processor", () => {
     };
   }
 
+  it("skips when download record not found", async () => {
+    const processor = getProcessor();
+    mockFindUnique.mockResolvedValue(null);
+
+    await processor(makeJob());
+
+    expect(mockGetObjectStream).not.toHaveBeenCalled();
+    expect(mockGenerateThumbnail).not.toHaveBeenCalled();
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
   it("skips processing when thumbnailPath is already set", async () => {
     const processor = getProcessor();
     mockFindUnique.mockResolvedValue({ thumbnailPath: "user-1/dl-abc/thumbnail.jpg" });

@@ -25,11 +25,28 @@ export function createThumbnailWorker() {
         // Check if the download still needs a thumbnail
         const download = await prisma.download.findUnique({
           where: { id: downloadId },
-          select: { thumbnailPath: true },
+          select: { thumbnailPath: true, fileSize: true },
         });
+
+        if (!download) {
+          console.warn(`[thumbnail-worker] Download ${downloadId} not found, skipping`);
+          return;
+        }
 
         if (download?.thumbnailPath) {
           console.log(`[thumbnail-worker] Skipping ${downloadId} — thumbnail already set`);
+          return;
+        }
+
+        const MAX_THUMBNAIL_FILE_SIZE = 500 * 1024 * 1024; // 500MB
+        if (download.fileSize && download.fileSize > BigInt(MAX_THUMBNAIL_FILE_SIZE)) {
+          console.log(`[thumbnail-worker] File too large for thumbnail (${download.fileSize} bytes), skipping`);
+          return;
+        }
+
+        const validMimeTypes = Object.values(MimeType);
+        if (!validMimeTypes.includes(mimeType as MimeType)) {
+          console.warn(`[thumbnail-worker] Unknown mimeType "${mimeType}" for ${downloadId}, skipping`);
           return;
         }
 
@@ -67,10 +84,6 @@ export function createThumbnailWorker() {
 
   worker.on("completed", (job) => {
     console.log(`[thumbnail-worker] Job ${job.id} completed`);
-  });
-
-  worker.on("failed", (job, err) => {
-    console.error(`[thumbnail-worker] Job ${job?.id} failed:`, err);
   });
 
   return worker;
