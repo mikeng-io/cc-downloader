@@ -7,6 +7,7 @@ import type { Job } from "bullmq";
 import type { DownloadJobData } from "../queue";
 import { mkdir, rm, stat, readdir } from "fs/promises";
 import { join } from "path";
+import { generateAndUploadThumbnail } from "../thumbnail";
 
 const execFileAsync = promisify(execFile);
 
@@ -94,6 +95,9 @@ export async function handleYtdlpDownload(job: Job<DownloadJobData>) {
       }
     );
 
+    // Step 3.5: Generate thumbnail (does not fail the download on error)
+    const thumbnailKey = await generateAndUploadThumbnail(filePath, mimeType, userId, downloadId);
+
     // Step 4: Update database
     await job.updateProgress(95);
 
@@ -107,6 +111,7 @@ export async function handleYtdlpDownload(job: Job<DownloadJobData>) {
         fileSize: BigInt(fileStats.size),
         mimeType,
         storagePath: storageKey,
+        thumbnailPath: thumbnailKey,
         title: info.title,
         description: info.description,
         completedAt: new Date(),
