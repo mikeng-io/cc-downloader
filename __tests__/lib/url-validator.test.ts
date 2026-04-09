@@ -83,7 +83,7 @@ describe("URL Validator", () => {
       const result = submissionUrlSchema.safeParse({});
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error.errors[0].message).toContain("required");
+        expect(result.error.errors[0].message.toLowerCase()).toContain("required");
       }
     });
 

@@ -72,8 +72,12 @@ export const submissionUrlSchema = z.object({
     )
     .refine(
       (url) => {
-        const protocol = new URL(url).protocol;
-        return ["http:", "https:"].includes(protocol);
+        try {
+          const protocol = new URL(url).protocol;
+          return ["http:", "https:"].includes(protocol);
+        } catch {
+          return false;
+        }
       },
       "Only HTTP and HTTPS URLs are allowed"
     ),

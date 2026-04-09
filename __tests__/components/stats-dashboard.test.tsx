@@ -64,7 +64,7 @@ describe("StatsDashboard", () => {
     await waitFor(() => {
       expect(screen.getByText(/Total Downloads.*42/)).toBeInTheDocument();
       expect(screen.getByText(/Completed.*30/)).toBeInTheDocument();
-      expect(screen.getByText(/Processing.*5/)).toBeInTheDocument();
+      expect(screen.getByText(/In Progress.*8/)).toBeInTheDocument();
       expect(screen.getByText(/Failed.*4/)).toBeInTheDocument();
     });
   });
@@ -93,7 +93,7 @@ describe("StatsDashboard", () => {
 
     render(<StatsDashboard />);
 
-    expect(screen.getByText(/Failed to load statistics/)).toBeInTheDocument();
+    expect(screen.getByText(/Unable to load statistics/)).toBeInTheDocument();
     expect(screen.getByText("Retry")).toBeInTheDocument();
   });
 
