@@ -28,12 +28,12 @@ export async function GET(
   }
 
   if (!download.thumbnailPath) {
-    const canGenerate =
-      download.status === DownloadStatus.COMPLETED &&
-      download.storagePath &&
-      THUMBNAIL_SUPPORTED_MIMES.has(download.mimeType);
-
-    if (!canGenerate) {
+    const { storagePath } = download;
+    if (
+      download.status !== DownloadStatus.COMPLETED ||
+      !storagePath ||
+      !THUMBNAIL_SUPPORTED_MIMES.has(download.mimeType)
+    ) {
       return NextResponse.json({ error: "No thumbnail available" }, { status: 404 });
     }
 
@@ -41,7 +41,7 @@ export async function GET(
     await addThumbnailJob({
       downloadId: download.id,
       userId: download.userId,
-      storagePath: download.storagePath,
+      storagePath,
       mimeType: download.mimeType,
     });
 
