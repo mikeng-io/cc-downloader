@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+import { DownloadStatus } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getObjectStream } from "@/lib/minio";
+import { addThumbnailJob } from "@/lib/thumbnail-queue";
+
+const THUMBNAIL_SUPPORTED_MIMES = new Set([
+  "VIDEO_MP4", "VIDEO_WEBM",
+  "IMAGE_JPEG", "IMAGE_PNG", "IMAGE_GIF", "IMAGE_WEBP",
+]);
 
 export async function GET(
   request: NextRequest,
@@ -21,7 +28,24 @@ export async function GET(
   }
 
   if (!download.thumbnailPath) {
-    return NextResponse.json({ error: "No thumbnail available" }, { status: 404 });
+    const canGenerate =
+      download.status === DownloadStatus.COMPLETED &&
+      download.storagePath &&
+      THUMBNAIL_SUPPORTED_MIMES.has(download.mimeType);
+
+    if (!canGenerate) {
+      return NextResponse.json({ error: "No thumbnail available" }, { status: 404 });
+    }
+
+    // Enqueue thumbnail generation (jobId = downloadId ensures deduplication)
+    await addThumbnailJob({
+      downloadId: download.id,
+      userId: download.userId,
+      storagePath: download.storagePath,
+      mimeType: download.mimeType,
+    });
+
+    return NextResponse.json({ status: "generating" }, { status: 202 });
   }
 
   try {
