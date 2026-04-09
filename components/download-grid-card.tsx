@@ -22,7 +22,7 @@ interface Props {
 }
 
 const IMAGE_MIMES = new Set(["IMAGE_JPEG", "IMAGE_PNG", "IMAGE_GIF", "IMAGE_WEBP"]);
-const VIDEO_MIMES = new Set(["VIDEO_MP4", "VIDEO_WEBM"]);
+const VIDEO_MIMES = new Set(["VIDEO_MP4", "VIDEO_WEBM", "VIDEO_MOV"]);
 
 const STATUS_COLORS: Record<string, string> = {
   COMPLETED: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",

@@ -370,7 +370,7 @@ async function updateProgress(
   });
 }
 
-function getMimeTypeFromContentType(contentType: string | null): MimeType {
+export function getMimeTypeFromContentType(contentType: string | null): MimeType {
   if (!contentType) return MimeType.UNKNOWN;
 
   const type = contentType.toLowerCase();
@@ -384,6 +384,7 @@ function getMimeTypeFromContentType(contentType: string | null): MimeType {
   if (type.includes("audio/mpeg")) return MimeType.AUDIO_MP3;
   if (type.includes("audio/wav")) return MimeType.AUDIO_WAV;
   if (type.includes("audio/mp4") || type.includes("audio/m4a")) return MimeType.AUDIO_M4A;
+  if (type.includes("video/quicktime") || type.includes("video/mov")) return MimeType.VIDEO_MOV;
 
   return MimeType.UNKNOWN;
 }

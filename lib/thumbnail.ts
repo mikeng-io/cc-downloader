@@ -8,7 +8,7 @@ import { uploadFile } from "./minio";
 const FFMPEG_PATH = process.env.FFMPEG_PATH || "ffmpeg";
 const THUMBNAIL_WIDTH = 400;
 
-const VIDEO_MIME_TYPES = new Set<MimeType>([MimeType.VIDEO_MP4, MimeType.VIDEO_WEBM]);
+const VIDEO_MIME_TYPES = new Set<MimeType>([MimeType.VIDEO_MP4, MimeType.VIDEO_WEBM, MimeType.VIDEO_MOV]);
 const IMAGE_MIME_TYPES = new Set<MimeType>([
   MimeType.IMAGE_JPEG,
   MimeType.IMAGE_PNG,

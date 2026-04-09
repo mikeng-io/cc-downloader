@@ -106,4 +106,25 @@ describe("generateAndUploadThumbnailFromBuffer", () => {
     const result = await generateAndUploadThumbnailFromBuffer(buf, MimeType.VIDEO_MP4, "u1", "d1");
     expect(result).toBe("u1/d1/thumbnail.jpg");
   });
+
+  it("writes temp file and delegates for VIDEO_MOV (same as VIDEO_MP4)", async () => {
+    const { execFile } = await import("child_process");
+    vi.mocked(execFile).mockResolvedValue(undefined as any);
+    const buf = Buffer.from("mov-video-bytes");
+    const result = await generateAndUploadThumbnailFromBuffer(buf, MimeType.VIDEO_MOV, "u1", "d1");
+    expect(result).toBe("u1/d1/thumbnail.jpg");
+  });
+});
+
+describe("generateAndUploadThumbnail - VIDEO_MOV", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("calls ffmpeg for VIDEO_MOV and returns storage key", async () => {
+    const { execFile } = await import("child_process");
+    vi.mocked(execFile).mockResolvedValue(undefined as any);
+    const result = await generateAndUploadThumbnail("/path/video.mov", MimeType.VIDEO_MOV, "u1", "d1");
+    expect(vi.mocked(execFile)).toHaveBeenCalled();
+    expect(uploadFile).toHaveBeenCalledWith("u1/d1/thumbnail.jpg", expect.any(Buffer), { "Content-Type": "image/jpeg" });
+    expect(result).toBe("u1/d1/thumbnail.jpg");
+  });
 });

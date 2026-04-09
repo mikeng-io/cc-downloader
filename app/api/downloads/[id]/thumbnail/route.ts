@@ -6,7 +6,7 @@ import { getObjectStream } from "@/lib/minio";
 import { addThumbnailJob } from "@/lib/thumbnail-queue";
 
 const THUMBNAIL_SUPPORTED_MIMES = new Set([
-  "VIDEO_MP4", "VIDEO_WEBM",
+  "VIDEO_MP4", "VIDEO_WEBM", "VIDEO_MOV",
   "IMAGE_JPEG", "IMAGE_PNG", "IMAGE_GIF", "IMAGE_WEBP",
 ]);
 
