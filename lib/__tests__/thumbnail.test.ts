@@ -71,6 +71,15 @@ describe("generateAndUploadThumbnail", () => {
     const result = await generateAndUploadThumbnail("/path/img.png", MimeType.IMAGE_PNG, "u1", "d1");
     expect(result).toBeNull();
   });
+
+  it("calls ffmpeg for VIDEO_MP4 and returns storage key", async () => {
+    const { execFile } = await import("child_process");
+    vi.mocked(execFile).mockResolvedValue(undefined as any);
+    const result = await generateAndUploadThumbnail("/path/video.mp4", MimeType.VIDEO_MP4, "u1", "d1");
+    expect(vi.mocked(execFile)).toHaveBeenCalled();
+    expect(uploadFile).toHaveBeenCalledWith("u1/d1/thumbnail.jpg", expect.any(Buffer), { "Content-Type": "image/jpeg" });
+    expect(result).toBe("u1/d1/thumbnail.jpg");
+  });
 });
 
 describe("generateAndUploadThumbnailFromBuffer", () => {
@@ -87,6 +96,14 @@ describe("generateAndUploadThumbnailFromBuffer", () => {
     const buf = Buffer.from("png-bytes");
     const result = await generateAndUploadThumbnailFromBuffer(buf, MimeType.IMAGE_WEBP, "u1", "d1");
     expect(sharp).toHaveBeenCalledWith(buf);
+    expect(result).toBe("u1/d1/thumbnail.jpg");
+  });
+
+  it("writes temp file and delegates for VIDEO_MP4", async () => {
+    const { execFile } = await import("child_process");
+    vi.mocked(execFile).mockResolvedValue(undefined as any);
+    const buf = Buffer.from("video-bytes");
+    const result = await generateAndUploadThumbnailFromBuffer(buf, MimeType.VIDEO_MP4, "u1", "d1");
     expect(result).toBe("u1/d1/thumbnail.jpg");
   });
 });

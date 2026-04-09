@@ -1,4 +1,4 @@
-import { mkdtemp, rm, readFile, writeFile } from "fs/promises";
+import { rm } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
 import sharp from "sharp";
@@ -23,6 +23,7 @@ export function thumbnailStorageKey(userId: string, downloadId: string): string 
 async function generateVideoThumbnailBuffer(filePath: string): Promise<Buffer> {
   const { execFile } = await import("child_process");
   const { promisify } = await import("util");
+  const { mkdtemp, readFile } = await import("fs/promises");
   const execFileAsync = promisify(execFile);
   const tempDir = await mkdtemp(join(tmpdir(), "cc-thumb-"));
   const outputPath = join(tempDir, "thumb.jpg");
@@ -37,7 +38,7 @@ async function generateVideoThumbnailBuffer(filePath: string): Promise<Buffer> {
     ], { timeout: 30000 });
     return await readFile(outputPath);
   } finally {
-    await rm(tempDir, { recursive: true, force: true });
+    await rm(tempDir, { recursive: true, force: true }).catch(() => {});
   }
 }
 
@@ -79,13 +80,18 @@ export async function generateAndUploadThumbnailFromBuffer(
   downloadId: string,
 ): Promise<string | null> {
   if (VIDEO_MIME_TYPES.has(mimeType)) {
-    const tempDir = await mkdtemp(join(tmpdir(), "cc-thumb-dl-"));
-    const tempFilePath = join(tempDir, "source.bin");
+    let tempDir: string | undefined;
     try {
+      const { mkdtemp, writeFile } = await import("fs/promises");
+      tempDir = await mkdtemp(join(tmpdir(), "cc-thumb-dl-"));
+      const tempFilePath = join(tempDir, "source.bin");
       await writeFile(tempFilePath, buffer);
       return await generateAndUploadThumbnail(tempFilePath, mimeType, userId, downloadId);
+    } catch (error) {
+      console.error(`[thumbnail] Failed to generate thumbnail for ${downloadId}:`, error);
+      return null;
     } finally {
-      await rm(tempDir, { recursive: true, force: true });
+      if (tempDir) await rm(tempDir, { recursive: true, force: true }).catch(() => {});
     }
   } else if (IMAGE_MIME_TYPES.has(mimeType)) {
     const storageKey = thumbnailStorageKey(userId, downloadId);
