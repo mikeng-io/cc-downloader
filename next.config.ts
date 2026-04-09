@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: 'standalone',
+  serverExternalPackages: ['sharp'],
   // Fix workspace root detection for module resolution
   outputFileTracingRoot: process.cwd(),
   /* config options here */

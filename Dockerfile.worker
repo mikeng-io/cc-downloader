@@ -1,7 +1,7 @@
 FROM node:22-alpine AS base
 
 # Install dependencies for native modules and media processing
-RUN apk add --no-cache python3 make g++ openssl ffmpeg curl
+RUN apk add --no-cache python3 make g++ openssl ffmpeg curl vips-dev
 
 # Install yt-dlp from Alpine packages
 RUN apk add --no-cache yt-dlp
@@ -13,6 +13,8 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 # Install dependencies without running postinstall scripts
 RUN npm ci --ignore-scripts
+# Set up sharp's native binary (skipped by --ignore-scripts)
+RUN npm rebuild sharp
 
 FROM base AS builder
 WORKDIR /app
