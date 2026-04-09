@@ -10,6 +10,7 @@ export interface GridDownload {
   status: string;
   mimeType: string;
   thumbnailPath: string | null;
+  spritePath: string | null;
   createdAt: string;
   downloadType: string;
 }
@@ -35,6 +36,7 @@ const STATUS_COLORS: Record<string, string> = {
 type ThumbnailState = "idle" | "loading" | "generating" | "ready" | "unavailable";
 
 const MAX_RETRIES = 5;
+const SPRITE_FRAMES = 10;
 
 export function DownloadGridCard({ download, onPreview, onDelete, onRetry }: Props) {
   const ref = useRef<HTMLDivElement>(null);
@@ -47,6 +49,19 @@ export function DownloadGridCard({ download, onPreview, onDelete, onRetry }: Pro
   const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const blobUrlRef = useRef<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Sprite state
+  const [spriteState, setSpriteState] = useState<"idle" | "loading" | "generating" | "ready" | "unavailable">("idle");
+  const [spriteBlobUrl, setSpriteBlobUrl] = useState<string | null>(null);
+  const spriteRetryRef = useRef(0);
+  const spriteBlobUrlRef = useRef<string | null>(null);
+  const spriteRetryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const spriteAbortControllerRef = useRef<AbortController | null>(null);
+
+  // Hover scrubbing state
+  const [isHovered, setIsHovered] = useState(false);
+  const [scrubFrame, setScrubFrame] = useState(0);
+  const thumbnailAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const el = ref.current;
@@ -137,12 +152,88 @@ export function DownloadGridCard({ download, onPreview, onDelete, onRetry }: Pro
     };
   }, [isVisible, isCompleted, hasThumbnail]);
 
+  // Sprite fetch effect (only for videos)
+  useEffect(() => {
+    if (!isVisible || !isCompleted || !isVideo) return;
+    if (spriteState !== "idle" && spriteState !== "generating") return;
+
+    let cancelled = false;
+
+    async function fetchSprite(attempt: number) {
+      if (cancelled) return;
+
+      setSpriteState(attempt === 0 ? "loading" : "generating");
+
+      const controller = new AbortController();
+      spriteAbortControllerRef.current = controller;
+
+      try {
+        const response = await fetch(`/api/downloads/${download.id}/sprite`, {
+          signal: controller.signal,
+        });
+
+        if (cancelled) return;
+
+        if (response.ok) {
+          const blob = await response.blob();
+          if (cancelled) return;
+          const url = URL.createObjectURL(blob);
+          spriteBlobUrlRef.current = url;
+          setSpriteBlobUrl(url);
+          setSpriteState("ready");
+        } else if (response.status === 202) {
+          if (attempt >= MAX_RETRIES - 1) {
+            setSpriteState("unavailable");
+            return;
+          }
+          const delay = Math.min(2000 * Math.pow(2, attempt), 16000);
+          spriteRetryTimeoutRef.current = setTimeout(() => {
+            if (!cancelled) {
+              spriteRetryRef.current = attempt + 1;
+              fetchSprite(attempt + 1);
+            }
+          }, delay);
+        } else {
+          setSpriteState("unavailable");
+        }
+      } catch {
+        if (!cancelled) {
+          setSpriteState("unavailable");
+        }
+      }
+    }
+
+    fetchSprite(spriteRetryRef.current);
+
+    return () => {
+      cancelled = true;
+      if (spriteRetryTimeoutRef.current !== null) {
+        clearTimeout(spriteRetryTimeoutRef.current);
+        spriteRetryTimeoutRef.current = null;
+      }
+      if (spriteAbortControllerRef.current) {
+        spriteAbortControllerRef.current.abort();
+        spriteAbortControllerRef.current = null;
+      }
+    };
+  }, [isVisible, isCompleted, isVideo]);
+
   // Cleanup blob URL on unmount
   useEffect(() => {
     return () => {
       if (blobUrlRef.current) {
         URL.revokeObjectURL(blobUrlRef.current);
         blobUrlRef.current = null;
+      }
+    };
+  }, []);
+
+  // Cleanup sprite blob URL on unmount
+  useEffect(() => {
+    return () => {
+      if (spriteBlobUrlRef.current) {
+        URL.revokeObjectURL(spriteBlobUrlRef.current);
+        spriteBlobUrlRef.current = null;
       }
     };
   }, []);
@@ -160,8 +251,17 @@ export function DownloadGridCard({ download, onPreview, onDelete, onRetry }: Pro
     >
       {/* Thumbnail area */}
       <div
+        ref={thumbnailAreaRef}
         className={`relative aspect-video w-full bg-surface-container-high ${isCompleted ? "cursor-pointer" : ""}`}
         onClick={isCompleted ? onPreview : undefined}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => { setIsHovered(false); setScrubFrame(0); }}
+        onMouseMove={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          const x = e.clientX - rect.left;
+          const frame = Math.min(Math.floor((x / rect.width) * SPRITE_FRAMES), SPRITE_FRAMES - 1);
+          setScrubFrame(frame);
+        }}
       >
         {thumbnailState === "ready" && blobUrl ? (
           <img
@@ -185,6 +285,19 @@ export function DownloadGridCard({ download, onPreview, onDelete, onRetry }: Pro
           </div>
         )}
 
+        {/* Sprite scrubbing overlay */}
+        {isVideo && spriteState === "ready" && isHovered && (
+          <div
+            className="absolute inset-0"
+            style={{
+              backgroundImage: `url(${spriteBlobUrl})`,
+              backgroundRepeat: "no-repeat",
+              backgroundSize: `${SPRITE_FRAMES * 100}% 100%`,
+              backgroundPosition: `${(scrubFrame / (SPRITE_FRAMES - 1)) * 100}% 0%`,
+            }}
+          />
+        )}
+
         {/* Status badge */}
         <div className="absolute left-2 top-2">
           <span
@@ -197,11 +310,18 @@ export function DownloadGridCard({ download, onPreview, onDelete, onRetry }: Pro
         </div>
 
         {/* Play icon overlay for videos with thumbnail */}
-        {isVideo && isCompleted && thumbnailState === "ready" && (
+        {isVideo && isCompleted && thumbnailState === "ready" && !isHovered && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 transition-opacity group-hover:opacity-100">
             <span className="material-symbols-outlined rounded-full bg-black/50 p-2 text-3xl text-white">
               play_arrow
             </span>
+          </div>
+        )}
+
+        {/* Frame indicator during scrubbing */}
+        {isVideo && spriteState === "ready" && isHovered && (
+          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded bg-black/60 px-2 py-0.5 text-xs text-white">
+            {scrubFrame + 1} / {SPRITE_FRAMES}
           </div>
         )}
       </div>

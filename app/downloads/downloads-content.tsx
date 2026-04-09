@@ -16,6 +16,7 @@ interface Download {
   fileSize?: string | null;
   mimeType: string;
   thumbnailPath: string | null;
+  spritePath: string | null;
   createdAt: string;
 }
 
@@ -241,7 +242,17 @@ export function DownloadsContent() {
                 {downloads.map((download) => (
                   <DownloadGridCard
                     key={download.id}
-                    download={download}
+                    download={{
+                      id: download.id,
+                      fileName: download.fileName,
+                      fileSize: download.fileSize,
+                      status: download.status,
+                      mimeType: download.mimeType,
+                      thumbnailPath: download.thumbnailPath,
+                      spritePath: download.spritePath,
+                      createdAt: download.createdAt,
+                      downloadType: download.downloadType,
+                    }}
                     onPreview={() => {
                       const idx = completedDownloads.findIndex((d) => d.id === download.id);
                       setPreviewIndex(idx >= 0 ? idx : null);
