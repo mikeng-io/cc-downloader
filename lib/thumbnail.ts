@@ -6,6 +6,7 @@ import { MimeType } from "@prisma/client";
 import { uploadFile } from "./minio";
 
 const FFMPEG_PATH = process.env.FFMPEG_PATH || "ffmpeg";
+const FFPROBE_PATH = process.env.FFPROBE_PATH || "ffprobe";
 const THUMBNAIL_WIDTH = 400;
 const SPRITE_FRAMES = 10;
 const FRAME_WIDTH = 320;
@@ -130,7 +131,7 @@ export async function generateAndUploadSpriteSheet(
     const execFileAsync = promisify(execFile);
 
     // Get video duration via ffprobe
-    const probeResult = await execFileAsync("ffprobe", [
+    const probeResult = await execFileAsync(FFPROBE_PATH, [
       "-v", "quiet",
       "-print_format", "json",
       "-show_format",

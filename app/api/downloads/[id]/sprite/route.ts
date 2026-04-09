@@ -37,6 +37,7 @@ export async function GET(
     }
 
     // Enqueue thumbnail job (sprite is generated as part of the thumbnail job)
+    // addThumbnailJob uses jobId = downloadId — BullMQ deduplicates, safe to call on every poll
     await addThumbnailJob({
       downloadId: download.id,
       userId: download.userId,
