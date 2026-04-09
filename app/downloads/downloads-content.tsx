@@ -5,6 +5,7 @@ import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { Pagination } from "@/components/pagination";
 import { ImagePreviewModal } from "@/components/image-preview-modal";
 import { formatFileSize } from "@/lib/utils/format-file-size";
+import { DownloadGridCard } from "@/components/download-grid-card";
 
 interface Download {
   id: string;
@@ -12,7 +13,9 @@ interface Download {
   downloadType: string;
   status: string;
   fileName: string | null;
-  fileSize?: number | null;
+  fileSize?: string | null;
+  mimeType: string;
+  thumbnailPath: string | null;
   createdAt: string;
 }
 
@@ -41,6 +44,17 @@ export function DownloadsContent() {
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState<DownloadsResponse["pagination"] | null>(null);
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
+  const [viewMode, setViewMode] = useState<"table" | "grid">("table");
+
+  useEffect(() => {
+    const saved = localStorage.getItem("downloads-view-mode") as "table" | "grid" | null;
+    if (saved === "grid" || saved === "table") setViewMode(saved);
+  }, []);
+
+  const setAndPersistViewMode = (mode: "table" | "grid") => {
+    setViewMode(mode);
+    localStorage.setItem("downloads-view-mode", mode);
+  };
 
   // Get completed downloads for preview navigation
   const completedDownloads = downloads.filter((d) => d.status === "COMPLETED");
@@ -170,6 +184,34 @@ export function DownloadsContent() {
             placeholder="Search by filename..."
             className="rounded-md border border-outline bg-surface px-3 py-2 text-sm text-on-surface placeholder:text-on-surface-variant focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary sm:w-64"
           />
+
+          {/* View mode toggle */}
+          <div className="ml-auto flex items-center gap-1 rounded-md border border-outline p-1">
+            <button
+              onClick={() => setAndPersistViewMode("table")}
+              className={`rounded p-1.5 transition-colors ${
+                viewMode === "table"
+                  ? "bg-primary/10 text-primary"
+                  : "text-on-surface-variant hover:bg-surface-container-high"
+              }`}
+              aria-label="Table view"
+              title="Table view"
+            >
+              <span className="material-symbols-outlined text-xl leading-none">table_rows</span>
+            </button>
+            <button
+              onClick={() => setAndPersistViewMode("grid")}
+              className={`rounded p-1.5 transition-colors ${
+                viewMode === "grid"
+                  ? "bg-primary/10 text-primary"
+                  : "text-on-surface-variant hover:bg-surface-container-high"
+              }`}
+              aria-label="Grid view"
+              title="Grid view"
+            >
+              <span className="material-symbols-outlined text-xl leading-none">grid_view</span>
+            </button>
+          </div>
         </div>
 
         {/* Downloads Table */}
@@ -194,6 +236,22 @@ export function DownloadsContent() {
           </div>
         ) : (
           <>
+            {viewMode === "grid" ? (
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                {downloads.map((download) => (
+                  <DownloadGridCard
+                    key={download.id}
+                    download={download}
+                    onPreview={() => {
+                      const idx = completedDownloads.findIndex((d) => d.id === download.id);
+                      setPreviewIndex(idx >= 0 ? idx : null);
+                    }}
+                    onDelete={handleDelete}
+                    onRetry={handleRetry}
+                  />
+                ))}
+              </div>
+            ) : (
             <div className="overflow-x-auto rounded-lg border border-outline-variant bg-surface-container">
               <table className="w-full">
                 <thead className="border-b border-outline-variant bg-surface-container-high">
@@ -238,7 +296,7 @@ export function DownloadsContent() {
                       </td>
                       <td className="px-4 py-3">
                         <span className="text-sm text-on-surface">
-                          {download.fileSize ? formatFileSize(download.fileSize) : "—"}
+                          {download.fileSize ? formatFileSize(Number(download.fileSize)) : "—"}
                         </span>
                       </td>
                       <td className="px-4 py-3">
@@ -305,6 +363,7 @@ export function DownloadsContent() {
                 </tbody>
               </table>
             </div>
+            )}
 
             {pagination && pagination.totalPages > 1 && (
               <Pagination
@@ -325,7 +384,7 @@ export function DownloadsContent() {
           onClose={() => setPreviewIndex(null)}
           imageUrl={`/api/downloads/${previewDownload.id}/content`}
           fileName={previewDownload.fileName || "Unknown"}
-          fileSize={previewDownload.fileSize}
+          fileSize={previewDownload.fileSize ? Number(previewDownload.fileSize) : null}
           downloadUrl={`/api/downloads/${previewDownload.id}/content`}
           onPrevious={() => setPreviewIndex((prev) => (prev !== null && prev > 0 ? prev - 1 : prev))}
           onNext={() => setPreviewIndex((prev) => (prev !== null && prev < completedDownloads.length - 1 ? prev + 1 : prev))}
