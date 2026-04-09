@@ -1,7 +1,7 @@
 FROM node:22-alpine AS base
 
 # Install dependencies for native modules
-RUN apk add --no-cache python3 make g++ openssl vips-dev
+RUN apk add --no-cache python3 make g++ openssl
 
 FROM base AS deps
 WORKDIR /app
@@ -9,9 +9,8 @@ WORKDIR /app
 # Copy package files
 COPY package.json package-lock.json* ./
 # Install dependencies without running postinstall scripts
+# sharp uses prebuilt binaries (@img/sharp-linux-musl-x64) — no rebuild needed
 RUN npm ci --ignore-scripts
-# Set up sharp's native binary (skipped by --ignore-scripts)
-RUN npm rebuild sharp
 
 FROM base AS builder
 WORKDIR /app
