@@ -41,9 +41,9 @@ export function DownloadGridCard({ download, onPreview, onDelete, onRetry }: Pro
   const [isVisible, setIsVisible] = useState(false);
   const [thumbnailState, setThumbnailState] = useState<ThumbnailState>("idle");
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
-  const [retryCount, setRetryCount] = useState(0);
 
   // Keep refs so effect cleanup can access latest values without re-running
+  const retryCountRef = useRef(0);
   const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const blobUrlRef = useRef<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -104,11 +104,10 @@ export function DownloadGridCard({ download, onPreview, onDelete, onRetry }: Pro
             setThumbnailState("unavailable");
             return;
           }
-          setThumbnailState("generating");
           const delay = Math.min(2000 * Math.pow(2, attempt), 16000);
           retryTimeoutRef.current = setTimeout(() => {
             if (!cancelled) {
-              setRetryCount(attempt + 1);
+              retryCountRef.current = attempt + 1;
               fetchThumbnail(attempt + 1);
             }
           }, delay);
@@ -123,7 +122,7 @@ export function DownloadGridCard({ download, onPreview, onDelete, onRetry }: Pro
       }
     }
 
-    fetchThumbnail(retryCount);
+    fetchThumbnail(retryCountRef.current);
 
     return () => {
       cancelled = true;
@@ -136,7 +135,6 @@ export function DownloadGridCard({ download, onPreview, onDelete, onRetry }: Pro
         abortControllerRef.current = null;
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isVisible, isCompleted, hasThumbnail]);
 
   // Cleanup blob URL on unmount
