@@ -1,4 +1,4 @@
-import { Queue, Worker, Job } from "bullmq";
+import { Queue } from "bullmq";
 import { getRedis } from "./redis";
 
 export interface ThumbnailJobData {
@@ -23,6 +23,11 @@ export function getThumbnailQueue(): Queue<ThumbnailJobData> {
     });
   }
   return thumbnailQueue;
+}
+
+/** For testing only — resets the singleton so Queue constructor is called again. */
+export function _resetThumbnailQueue(): void {
+  thumbnailQueue = null;
 }
 
 export async function addThumbnailJob(data: ThumbnailJobData): Promise<void> {

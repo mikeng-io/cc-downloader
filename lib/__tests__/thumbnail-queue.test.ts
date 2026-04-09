@@ -56,11 +56,11 @@ function makeReadable(data: Buffer): Readable {
 
 // ── Import modules under test (after mocks are set up) ───────────────────────
 
-const { addThumbnailJob, getThumbnailQueue } = await import("../thumbnail-queue");
+const { addThumbnailJob, getThumbnailQueue, _resetThumbnailQueue } = await import("../thumbnail-queue");
 
 // We need the raw worker processor — pull it from the Worker mock calls.
 // Import createThumbnailWorker so we can call it and extract the processor.
-import { Worker } from "bullmq";
+import { Worker, Queue } from "bullmq";
 const { createThumbnailWorker } = await import("../workers/thumbnail-worker");
 
 // ── Tests ────────────────────────────────────────────────────────────────────
@@ -86,9 +86,12 @@ describe("addThumbnailJob", () => {
   });
 
   it("uses the same queue instance on repeated calls (singleton)", async () => {
+    _resetThumbnailQueue();
+    vi.clearAllMocks();
     const q1 = getThumbnailQueue();
     const q2 = getThumbnailQueue();
     expect(q1).toBe(q2);
+    expect(Queue).toHaveBeenCalledTimes(1);
   });
 });
 
