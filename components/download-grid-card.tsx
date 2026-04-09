@@ -32,10 +32,21 @@ const STATUS_COLORS: Record<string, string> = {
   CANCELLED: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300",
 };
 
+type ThumbnailState = "idle" | "loading" | "generating" | "ready" | "unavailable";
+
+const MAX_RETRIES = 5;
+
 export function DownloadGridCard({ download, onPreview, onDelete, onRetry }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const [isVisible, setIsVisible] = useState(false);
-  const [imgError, setImgError] = useState(false);
+  const [thumbnailState, setThumbnailState] = useState<ThumbnailState>("idle");
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+
+  // Keep refs so effect cleanup can access latest values without re-running
+  const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const blobUrlRef = useRef<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     const el = ref.current;
@@ -56,16 +67,87 @@ export function DownloadGridCard({ download, onPreview, onDelete, onRetry }: Pro
   const isCompleted = download.status === "COMPLETED";
   const isImage = IMAGE_MIMES.has(download.mimeType);
   const isVideo = VIDEO_MIMES.has(download.mimeType);
+  const hasThumbnail = download.thumbnailPath !== null || isImage || isVideo;
 
-  // Resolve thumbnail source: server thumbnail > image content > nothing
-  let thumbnailSrc: string | null = null;
-  if (isCompleted && !imgError) {
-    if (download.thumbnailPath) {
-      thumbnailSrc = `/api/downloads/${download.id}/thumbnail`;
-    } else if (isImage) {
-      thumbnailSrc = `/api/downloads/${download.id}/content`;
+  useEffect(() => {
+    if (!isVisible || !isCompleted || !hasThumbnail) return;
+    if (thumbnailState !== "idle" && thumbnailState !== "generating") return;
+
+    let cancelled = false;
+
+    async function fetchThumbnail(attempt: number) {
+      if (cancelled) return;
+
+      setThumbnailState(attempt === 0 ? "loading" : "generating");
+
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+
+      try {
+        const response = await fetch(`/api/downloads/${download.id}/thumbnail`, {
+          signal: controller.signal,
+        });
+
+        if (cancelled) return;
+
+        if (response.ok) {
+          // 200 — image bytes ready
+          const blob = await response.blob();
+          if (cancelled) return;
+          const url = URL.createObjectURL(blob);
+          blobUrlRef.current = url;
+          setBlobUrl(url);
+          setThumbnailState("ready");
+        } else if (response.status === 202) {
+          // Still generating
+          if (attempt >= MAX_RETRIES - 1) {
+            setThumbnailState("unavailable");
+            return;
+          }
+          setThumbnailState("generating");
+          const delay = Math.min(2000 * Math.pow(2, attempt), 16000);
+          retryTimeoutRef.current = setTimeout(() => {
+            if (!cancelled) {
+              setRetryCount(attempt + 1);
+              fetchThumbnail(attempt + 1);
+            }
+          }, delay);
+        } else {
+          // 404 or other error
+          setThumbnailState("unavailable");
+        }
+      } catch {
+        if (!cancelled) {
+          setThumbnailState("unavailable");
+        }
+      }
     }
-  }
+
+    fetchThumbnail(retryCount);
+
+    return () => {
+      cancelled = true;
+      if (retryTimeoutRef.current !== null) {
+        clearTimeout(retryTimeoutRef.current);
+        retryTimeoutRef.current = null;
+      }
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isVisible, isCompleted, hasThumbnail]);
+
+  // Cleanup blob URL on unmount
+  useEffect(() => {
+    return () => {
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
+      }
+    };
+  }, []);
 
   const mediaIcon = isVideo ? "videocam" : isImage ? "image" : "audio_file";
   const fileSizeNum =
@@ -83,13 +165,20 @@ export function DownloadGridCard({ download, onPreview, onDelete, onRetry }: Pro
         className={`relative aspect-video w-full bg-surface-container-high ${isCompleted ? "cursor-pointer" : ""}`}
         onClick={isCompleted ? onPreview : undefined}
       >
-        {isVisible && thumbnailSrc ? (
+        {thumbnailState === "ready" && blobUrl ? (
           <img
-            src={thumbnailSrc}
+            src={blobUrl}
             alt={download.fileName || "thumbnail"}
             className="h-full w-full object-cover"
-            onError={() => setImgError(true)}
+            onError={() => setThumbnailState("unavailable")}
           />
+        ) : thumbnailState === "loading" || thumbnailState === "generating" ? (
+          <div className="flex h-full flex-col items-center justify-center gap-1">
+            <div className="h-6 w-6 animate-spin rounded-full border-2 border-on-surface-variant border-t-transparent" />
+            {thumbnailState === "generating" && (
+              <span className="text-xs text-on-surface-variant">Generating...</span>
+            )}
+          </div>
         ) : (
           <div className="flex h-full items-center justify-center">
             <span className="material-symbols-outlined text-4xl text-on-surface-variant">
@@ -110,7 +199,7 @@ export function DownloadGridCard({ download, onPreview, onDelete, onRetry }: Pro
         </div>
 
         {/* Play icon overlay for videos with thumbnail */}
-        {isVideo && isCompleted && thumbnailSrc && !imgError && isVisible && (
+        {isVideo && isCompleted && thumbnailState === "ready" && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 transition-opacity group-hover:opacity-100">
             <span className="material-symbols-outlined rounded-full bg-black/50 p-2 text-3xl text-white">
               play_arrow
