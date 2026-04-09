@@ -61,7 +61,6 @@ export function DownloadGridCard({ download, onPreview, onDelete, onRetry }: Pro
   // Hover scrubbing state
   const [isHovered, setIsHovered] = useState(false);
   const [scrubFrame, setScrubFrame] = useState(0);
-  const thumbnailAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const el = ref.current;
@@ -251,7 +250,6 @@ export function DownloadGridCard({ download, onPreview, onDelete, onRetry }: Pro
     >
       {/* Thumbnail area */}
       <div
-        ref={thumbnailAreaRef}
         className={`relative aspect-video w-full bg-surface-container-high ${isCompleted ? "cursor-pointer" : ""}`}
         onClick={isCompleted ? onPreview : undefined}
         onMouseEnter={() => setIsHovered(true)}
