@@ -1,3 +1,5 @@
+import { MimeType } from "@prisma/client";
+
 /**
  * MIME type to file extension mapping
  * Used for extracting file extensions from Content-Type headers
@@ -103,4 +105,50 @@ export function getMimeTypeCategory(mimeType: string): string {
   if (baseMimeType.startsWith('text/')) return 'text';
 
   return 'unknown';
+}
+
+const DOWNLOAD_MIME_TO_HTTP: Record<string, string> = {
+  VIDEO_MP4: "video/mp4",
+  VIDEO_WEBM: "video/webm",
+  VIDEO_MOV: "video/quicktime",
+  AUDIO_MP3: "audio/mpeg",
+  AUDIO_M4A: "audio/mp4",
+  AUDIO_WAV: "audio/wav",
+  IMAGE_JPEG: "image/jpeg",
+  IMAGE_PNG: "image/png",
+  IMAGE_GIF: "image/gif",
+  IMAGE_WEBP: "image/webp",
+  UNKNOWN: "application/octet-stream",
+};
+
+export function toHttpContentType(mimeType: MimeType | string | null | undefined): string {
+  if (!mimeType) return "application/octet-stream";
+  return DOWNLOAD_MIME_TO_HTTP[mimeType] || "application/octet-stream";
+}
+
+export function inferDownloadMimeType(
+  mimeType: MimeType | string | null | undefined,
+  fileName?: string | null,
+  storagePath?: string | null,
+): MimeType {
+  if (mimeType && mimeType !== MimeType.UNKNOWN) {
+    return mimeType as MimeType;
+  }
+
+  const lowerName = (fileName || "").toLowerCase();
+  const lowerPath = (storagePath || "").toLowerCase();
+  const value = `${lowerName} ${lowerPath}`;
+
+  if (value.includes(".mp4")) return MimeType.VIDEO_MP4;
+  if (value.includes(".webm")) return MimeType.VIDEO_WEBM;
+  if (value.includes(".mov")) return MimeType.VIDEO_MOV;
+  if (value.includes(".jpg") || value.includes(".jpeg")) return MimeType.IMAGE_JPEG;
+  if (value.includes(".png")) return MimeType.IMAGE_PNG;
+  if (value.includes(".gif")) return MimeType.IMAGE_GIF;
+  if (value.includes(".webp")) return MimeType.IMAGE_WEBP;
+  if (value.includes(".mp3")) return MimeType.AUDIO_MP3;
+  if (value.includes(".wav")) return MimeType.AUDIO_WAV;
+  if (value.includes(".m4a")) return MimeType.AUDIO_M4A;
+
+  return MimeType.UNKNOWN;
 }

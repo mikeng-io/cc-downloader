@@ -87,6 +87,21 @@ describe("addThumbnailJob", () => {
     });
   });
 
+  it("allows callers to override jobId for sprite backfills", async () => {
+    const data = {
+      downloadId: "dl-123",
+      userId: "user-1",
+      storagePath: "user-1/dl-123/video.mp4",
+      mimeType: "VIDEO_MP4",
+    };
+
+    await addThumbnailJob(data, { jobId: "dl-123-sprite" });
+
+    expect(mockQueueAdd).toHaveBeenCalledWith("thumbnail", data, {
+      jobId: "dl-123-sprite",
+    });
+  });
+
   it("uses the same queue instance on repeated calls (singleton)", async () => {
     _resetThumbnailQueue();
     vi.clearAllMocks();

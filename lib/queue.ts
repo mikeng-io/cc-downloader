@@ -4,7 +4,7 @@ import { prisma } from "./prisma";
 import { DownloadStatus, MimeType } from "@prisma/client";
 import { handleYtdlpDownload, handleGalleryDlDownload } from "./workers/ytdlp-worker";
 import { ensureBucket, generateStorageKey, uploadFile } from "./minio";
-import { getExtensionFromMimeType } from "./mime-types";
+import { getExtensionFromMimeType, inferDownloadMimeType } from "./mime-types";
 import { generateAndUploadThumbnailFromBuffer } from "./thumbnail";
 
 // Job types
@@ -244,6 +244,10 @@ async function handleDirectDownload(job: Job<DownloadJobData>) {
   }
 
   const buffer = Buffer.concat(chunks);
+  const resolvedMimeType = inferDownloadMimeType(
+    getMimeTypeFromContentType(contentType),
+    filename,
+  );
 
   // Upload to MinIO
   updateProgress(85);
@@ -258,7 +262,7 @@ async function handleDirectDownload(job: Job<DownloadJobData>) {
   // Generate thumbnail (does not fail the download on error)
   const thumbnailKey = await generateAndUploadThumbnailFromBuffer(
     buffer,
-    getMimeTypeFromContentType(contentType),
+    resolvedMimeType,
     userId,
     downloadId,
   );
@@ -271,7 +275,7 @@ async function handleDirectDownload(job: Job<DownloadJobData>) {
       status: DownloadStatus.COMPLETED,
       fileName: filename,
       fileSize: BigInt(buffer.length),
-      mimeType: getMimeTypeFromContentType(contentType),
+      mimeType: resolvedMimeType,
       storagePath: storageKey,
       thumbnailPath: thumbnailKey,
       completedAt: new Date(),

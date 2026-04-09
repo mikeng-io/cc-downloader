@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getFileStats, getObjectStream, getPartialObjectStream } from "@/lib/minio";
 import { DownloadStatus } from "@prisma/client";
 import { createApiSpan } from "@/lib/otel";
+import { inferDownloadMimeType, toHttpContentType } from "@/lib/mime-types";
 
 
 /**
@@ -51,23 +52,16 @@ export async function HEAD(
 
     const stats = await getFileStats(download.storagePath);
 
-    const contentTypeMap: Record<string, string> = {
-      VIDEO_MP4: "video/mp4",
-      VIDEO_WEBM: "video/webm",
-      AUDIO_MP3: "audio/mpeg",
-      AUDIO_M4A: "audio/mp4",
-      AUDIO_WAV: "audio/wav",
-      IMAGE_JPEG: "image/jpeg",
-      IMAGE_PNG: "image/png",
-      IMAGE_GIF: "image/gif",
-      IMAGE_WEBP: "image/webp",
-      UNKNOWN: "application/octet-stream",
-    };
+    const effectiveMimeType = inferDownloadMimeType(
+      download.mimeType,
+      download.fileName,
+      download.storagePath,
+    );
 
     return new NextResponse(null, {
       status: 200,
       headers: {
-        "Content-Type": contentTypeMap[download.mimeType] || "application/octet-stream",
+        "Content-Type": toHttpContentType(effectiveMimeType),
         "Content-Length": stats.size.toString(),
         "Accept-Ranges": "bytes",
         "Cache-Control": "private, max-age=3600",
@@ -166,20 +160,12 @@ export async function GET(
       });
 
       // Determine content type based on mime type
-      const contentTypeMap: Record<string, string> = {
-        VIDEO_MP4: "video/mp4",
-        VIDEO_WEBM: "video/webm",
-        AUDIO_MP3: "audio/mpeg",
-        AUDIO_M4A: "audio/mp4",
-        AUDIO_WAV: "audio/wav",
-        IMAGE_JPEG: "image/jpeg",
-        IMAGE_PNG: "image/png",
-        IMAGE_GIF: "image/gif",
-        IMAGE_WEBP: "image/webp",
-        UNKNOWN: "application/octet-stream",
-      };
-
-      const contentType = contentTypeMap[download.mimeType] || "application/octet-stream";
+      const effectiveMimeType = inferDownloadMimeType(
+        download.mimeType,
+        download.fileName,
+        download.storagePath,
+      );
+      const contentType = toHttpContentType(effectiveMimeType);
 
       const headers = new Headers({
         "Content-Type": contentType,

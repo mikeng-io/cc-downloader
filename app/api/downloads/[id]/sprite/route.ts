@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getObjectStream } from "@/lib/minio";
 import { addThumbnailJob } from "@/lib/thumbnail-queue";
+import { inferDownloadMimeType } from "@/lib/mime-types";
 
 const SPRITE_SUPPORTED_MIMES = new Set([
   "VIDEO_MP4", "VIDEO_WEBM", "VIDEO_MOV",
@@ -26,23 +27,45 @@ export async function GET(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
+  const effectiveMimeType = inferDownloadMimeType(
+    download.mimeType,
+    download.fileName,
+    download.storagePath,
+  );
+
+  console.info("[sprite] Request received", {
+    ts: new Date().toISOString(),
+    downloadId: download.id,
+    userId: download.userId,
+    status: download.status,
+    hasThumbnail: Boolean(download.thumbnailPath),
+    hasSprite: Boolean(download.spritePath),
+    mimeType: effectiveMimeType,
+  });
+
   if (!download.spritePath) {
     const { storagePath } = download;
     if (
       download.status !== DownloadStatus.COMPLETED ||
       !storagePath ||
-      !SPRITE_SUPPORTED_MIMES.has(download.mimeType)
+      !SPRITE_SUPPORTED_MIMES.has(effectiveMimeType)
     ) {
       return NextResponse.json({ error: "No sprite available" }, { status: 404 });
     }
 
-    // Enqueue thumbnail job (sprite is generated as part of the thumbnail job)
-    // addThumbnailJob uses jobId = downloadId — BullMQ deduplicates, safe to call on every poll
+    const jobId = download.thumbnailPath ? `${download.id}-sprite` : download.id;
+
     await addThumbnailJob({
       downloadId: download.id,
       userId: download.userId,
       storagePath,
-      mimeType: download.mimeType,
+      mimeType: effectiveMimeType,
+    }, { jobId });
+
+    console.info("[sprite] Enqueued generation job", {
+      ts: new Date().toISOString(),
+      downloadId: download.id,
+      jobId,
     });
 
     return NextResponse.json({ status: "generating" }, { status: 202 });

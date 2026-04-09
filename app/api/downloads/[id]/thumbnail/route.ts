@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getObjectStream } from "@/lib/minio";
 import { addThumbnailJob } from "@/lib/thumbnail-queue";
+import { inferDownloadMimeType } from "@/lib/mime-types";
 
 const THUMBNAIL_SUPPORTED_MIMES = new Set([
   "VIDEO_MP4", "VIDEO_WEBM", "VIDEO_MOV",
@@ -27,12 +28,27 @@ export async function GET(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
+  const effectiveMimeType = inferDownloadMimeType(
+    download.mimeType,
+    download.fileName,
+    download.storagePath,
+  );
+
+  console.info("[thumbnail] Request received", {
+    ts: new Date().toISOString(),
+    downloadId: download.id,
+    userId: download.userId,
+    status: download.status,
+    hasThumbnail: Boolean(download.thumbnailPath),
+    mimeType: effectiveMimeType,
+  });
+
   if (!download.thumbnailPath) {
     const { storagePath } = download;
     if (
       download.status !== DownloadStatus.COMPLETED ||
       !storagePath ||
-      !THUMBNAIL_SUPPORTED_MIMES.has(download.mimeType)
+      !THUMBNAIL_SUPPORTED_MIMES.has(effectiveMimeType)
     ) {
       return NextResponse.json({ error: "No thumbnail available" }, { status: 404 });
     }
@@ -42,7 +58,13 @@ export async function GET(
       downloadId: download.id,
       userId: download.userId,
       storagePath,
-      mimeType: download.mimeType,
+      mimeType: effectiveMimeType,
+    });
+
+    console.info("[thumbnail] Enqueued generation job", {
+      ts: new Date().toISOString(),
+      downloadId: download.id,
+      jobId: download.id,
     });
 
     return NextResponse.json({ status: "generating" }, { status: 202 });

@@ -8,6 +8,10 @@ export interface ThumbnailJobData {
   mimeType: string; // MimeType enum value e.g. "VIDEO_MP4"
 }
 
+interface AddThumbnailJobOptions {
+  jobId?: string;
+}
+
 let thumbnailQueue: Queue<ThumbnailJobData> | null = null;
 
 export function getThumbnailQueue(): Queue<ThumbnailJobData> {
@@ -30,8 +34,11 @@ export function _resetThumbnailQueue(): void {
   thumbnailQueue = null;
 }
 
-export async function addThumbnailJob(data: ThumbnailJobData): Promise<void> {
+export async function addThumbnailJob(
+  data: ThumbnailJobData,
+  options?: AddThumbnailJobOptions,
+): Promise<void> {
   const queue = getThumbnailQueue();
-  // jobId = downloadId ensures deduplication — enqueueing the same download twice is a no-op
-  await queue.add("thumbnail", data, { jobId: data.downloadId });
+  const jobId = options?.jobId ?? data.downloadId;
+  await queue.add("thumbnail", data, { jobId });
 }

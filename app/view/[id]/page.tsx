@@ -8,6 +8,7 @@ import { PDFViewer } from "@/components/viewers/pdf-viewer";
 import { TextViewer } from "@/components/viewers/text-viewer";
 import { UnsupportedViewer } from "@/components/viewers/unsupported-viewer";
 import { ViewerWrapper } from "@/components/viewer-wrapper";
+import { inferDownloadMimeType } from "@/lib/mime-types";
 
 /**
  * MIME type viewer mapping
@@ -157,7 +158,12 @@ export default async function ViewPage(
   }
 
   // Get the appropriate viewer component
-  const ViewerComponent = getViewerForMimeType(download.mimeType);
+  const effectiveMimeType = inferDownloadMimeType(
+    download.mimeType,
+    download.fileName,
+    download.storagePath,
+  );
+  const ViewerComponent = getViewerForMimeType(effectiveMimeType);
 
   if (!ViewerComponent) {
     return <UnsupportedViewer download={download} />;

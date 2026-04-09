@@ -78,9 +78,12 @@ export function DownloadGridCard({ download, onPreview, onDelete, onRetry }: Pro
     return () => observer.disconnect();
   }, []);
 
+  const lowerFileName = (download.fileName || "").toLowerCase();
   const isCompleted = download.status === "COMPLETED";
-  const isImage = IMAGE_MIMES.has(download.mimeType);
-  const isVideo = VIDEO_MIMES.has(download.mimeType);
+  const isImage = IMAGE_MIMES.has(download.mimeType)
+    || (download.mimeType === "UNKNOWN" && [".jpg", ".jpeg", ".png", ".gif", ".webp"].some((ext) => lowerFileName.endsWith(ext)));
+  const isVideo = VIDEO_MIMES.has(download.mimeType)
+    || (download.mimeType === "UNKNOWN" && [".mp4", ".webm", ".mov"].some((ext) => lowerFileName.endsWith(ext)));
   const hasThumbnail = download.thumbnailPath !== null || isImage || isVideo;
 
   useEffect(() => {
