@@ -3,7 +3,7 @@ import { MimeType } from "@prisma/client";
 import { getRedis } from "../redis";
 import { prisma } from "../prisma";
 import { getObjectStream } from "../minio";
-import { generateAndUploadThumbnailFromBuffer } from "../thumbnail";
+import { generateAndUploadThumbnailFromBuffer, generateAndUploadSpriteSheetFromBuffer } from "../thumbnail";
 import type { ThumbnailJobData } from "../thumbnail-queue";
 
 async function streamToBuffer(stream: NodeJS.ReadableStream): Promise<Buffer> {
@@ -61,12 +61,28 @@ export function createThumbnailWorker() {
         downloadId
       );
 
-      if (key !== null) {
+      // Generate sprite sheet for videos (non-blocking)
+      const spriteKey = await generateAndUploadSpriteSheetFromBuffer(
+        buffer,
+        mimeType as MimeType,
+        userId,
+        downloadId,
+      );
+
+      if (key !== null || spriteKey !== null) {
         await prisma.download.update({
           where: { id: downloadId },
-          data: { thumbnailPath: key },
+          data: {
+            ...(key !== null ? { thumbnailPath: key } : {}),
+            ...(spriteKey !== null ? { spritePath: spriteKey } : {}),
+          },
         });
-        console.log(`[thumbnail-worker] Thumbnail generated for ${downloadId}: ${key}`);
+        if (key !== null) {
+          console.log(`[thumbnail-worker] Thumbnail generated for ${downloadId}: ${key}`);
+        }
+        if (spriteKey !== null) {
+          console.log(`[thumbnail-worker] Sprite sheet generated for ${downloadId}: ${spriteKey}`);
+        }
       } else {
         console.log(`[thumbnail-worker] No thumbnail generated for ${downloadId} (unsupported type or error)`);
       }

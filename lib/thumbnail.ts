@@ -7,6 +7,8 @@ import { uploadFile } from "./minio";
 
 const FFMPEG_PATH = process.env.FFMPEG_PATH || "ffmpeg";
 const THUMBNAIL_WIDTH = 400;
+const SPRITE_FRAMES = 10;
+const FRAME_WIDTH = 320;
 
 const VIDEO_MIME_TYPES = new Set<MimeType>([MimeType.VIDEO_MP4, MimeType.VIDEO_WEBM, MimeType.VIDEO_MOV]);
 const IMAGE_MIME_TYPES = new Set<MimeType>([
@@ -105,4 +107,89 @@ export async function generateAndUploadThumbnailFromBuffer(
     }
   }
   return null;
+}
+
+export function spriteStorageKey(userId: string, downloadId: string): string {
+  return `${userId}/${downloadId}/sprite.jpg`;
+}
+
+export async function generateAndUploadSpriteSheet(
+  sourceFilePath: string,
+  mimeType: MimeType,
+  userId: string,
+  downloadId: string,
+): Promise<string | null> {
+  if (!VIDEO_MIME_TYPES.has(mimeType)) {
+    return null;
+  }
+
+  try {
+    const { execFile } = await import("child_process");
+    const { promisify } = await import("util");
+    const { mkdtemp, readFile } = await import("fs/promises");
+    const execFileAsync = promisify(execFile);
+
+    // Get video duration via ffprobe
+    const probeResult = await execFileAsync("ffprobe", [
+      "-v", "quiet",
+      "-print_format", "json",
+      "-show_format",
+      sourceFilePath,
+    ], { timeout: 15000 });
+    const duration = parseFloat(JSON.parse(probeResult.stdout).format.duration);
+
+    if (!duration || duration < 2) {
+      console.log(`[thumbnail] Skipping sprite for ${downloadId}: duration ${duration}s too short`);
+      return null;
+    }
+
+    const interval = duration / SPRITE_FRAMES;
+    const storageKey = spriteStorageKey(userId, downloadId);
+
+    const tempDir = await mkdtemp(join(tmpdir(), "cc-sprite-"));
+    const outputPath = join(tempDir, "sprite.jpg");
+    try {
+      await execFileAsync(FFMPEG_PATH, [
+        "-i", sourceFilePath,
+        "-vf", `fps=1/${interval},scale=${FRAME_WIDTH}:-1,tile=${SPRITE_FRAMES}x1`,
+        "-frames:v", "1",
+        "-q:v", "3",
+        outputPath,
+      ], { timeout: 60000 });
+
+      const spriteBuffer = await readFile(outputPath);
+      await uploadFile(storageKey, spriteBuffer, { "Content-Type": "image/jpeg" });
+      return storageKey;
+    } finally {
+      await rm(tempDir, { recursive: true, force: true }).catch(() => {});
+    }
+  } catch (error) {
+    console.error(`[thumbnail] Failed to generate sprite sheet for ${downloadId}:`, error);
+    return null;
+  }
+}
+
+export async function generateAndUploadSpriteSheetFromBuffer(
+  buffer: Buffer,
+  mimeType: MimeType,
+  userId: string,
+  downloadId: string,
+): Promise<string | null> {
+  if (!VIDEO_MIME_TYPES.has(mimeType)) {
+    return null;
+  }
+
+  let tempDir: string | undefined;
+  try {
+    const { mkdtemp, writeFile } = await import("fs/promises");
+    tempDir = await mkdtemp(join(tmpdir(), "cc-sprite-dl-"));
+    const tempFilePath = join(tempDir, "source.bin");
+    await writeFile(tempFilePath, buffer);
+    return await generateAndUploadSpriteSheet(tempFilePath, mimeType, userId, downloadId);
+  } catch (error) {
+    console.error(`[thumbnail] Failed to generate sprite sheet for ${downloadId}:`, error);
+    return null;
+  } finally {
+    if (tempDir) await rm(tempDir, { recursive: true, force: true }).catch(() => {});
+  }
 }

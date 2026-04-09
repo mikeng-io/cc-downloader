@@ -175,6 +175,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         fileSize: download.fileSize?.toString() || null,
         mimeType: download.mimeType,
         thumbnailPath: download.thumbnailPath ?? null,
+        spritePath: download.spritePath ?? null,
         progress: download.progress ? {
           ...download.progress,
           bytesDownloaded: download.progress.bytesDownloaded?.toString() || "0",

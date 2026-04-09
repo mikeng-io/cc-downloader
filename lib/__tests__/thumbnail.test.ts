@@ -26,8 +26,14 @@ vi.mock("../minio", () => ({
   uploadFile: vi.fn().mockResolvedValue(undefined),
 }));
 
-const { thumbnailStorageKey, generateAndUploadThumbnail, generateAndUploadThumbnailFromBuffer } =
-  await import("../thumbnail");
+const {
+  thumbnailStorageKey,
+  generateAndUploadThumbnail,
+  generateAndUploadThumbnailFromBuffer,
+  spriteStorageKey,
+  generateAndUploadSpriteSheet,
+  generateAndUploadSpriteSheetFromBuffer,
+} = await import("../thumbnail");
 const { uploadFile } = await import("../minio");
 const sharp = (await import("sharp")).default;
 
@@ -126,5 +132,138 @@ describe("generateAndUploadThumbnail - VIDEO_MOV", () => {
     expect(vi.mocked(execFile)).toHaveBeenCalled();
     expect(uploadFile).toHaveBeenCalledWith("u1/d1/thumbnail.jpg", expect.any(Buffer), { "Content-Type": "image/jpeg" });
     expect(result).toBe("u1/d1/thumbnail.jpg");
+  });
+});
+
+describe("spriteStorageKey", () => {
+  it("returns deterministic sprite path", () => {
+    expect(spriteStorageKey("user1", "dl1")).toBe("user1/dl1/sprite.jpg");
+  });
+});
+
+describe("generateAndUploadSpriteSheet", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("returns null for non-video mimeTypes (AUDIO_MP3)", async () => {
+    const result = await generateAndUploadSpriteSheet("/path/file.mp3", MimeType.AUDIO_MP3, "u1", "d1");
+    expect(result).toBeNull();
+    expect(uploadFile).not.toHaveBeenCalled();
+  });
+
+  it("returns null for IMAGE_JPEG", async () => {
+    const result = await generateAndUploadSpriteSheet("/path/file.jpg", MimeType.IMAGE_JPEG, "u1", "d1");
+    expect(result).toBeNull();
+    expect(uploadFile).not.toHaveBeenCalled();
+  });
+
+  it("returns null for short videos (duration < 2s)", async () => {
+    const { execFile } = await import("child_process");
+    vi.mocked(execFile).mockResolvedValueOnce({
+      stdout: JSON.stringify({ format: { duration: "1.5" } }),
+      stderr: "",
+    } as any);
+    const result = await generateAndUploadSpriteSheet("/path/video.mp4", MimeType.VIDEO_MP4, "u1", "d1");
+    expect(result).toBeNull();
+    expect(uploadFile).not.toHaveBeenCalled();
+  });
+
+  it("calls ffprobe then ffmpeg for valid video and uploads sprite", async () => {
+    const { execFile } = await import("child_process");
+    // First call: ffprobe
+    vi.mocked(execFile)
+      .mockResolvedValueOnce({
+        stdout: JSON.stringify({ format: { duration: "60.0" } }),
+        stderr: "",
+      } as any)
+      // Second call: ffmpeg
+      .mockResolvedValueOnce(undefined as any);
+
+    const result = await generateAndUploadSpriteSheet("/path/video.mp4", MimeType.VIDEO_MP4, "u1", "d1");
+    expect(vi.mocked(execFile)).toHaveBeenCalledTimes(2);
+    // ffprobe call
+    expect(vi.mocked(execFile)).toHaveBeenNthCalledWith(
+      1,
+      "ffprobe",
+      expect.arrayContaining(["-show_format", "/path/video.mp4"]),
+      expect.objectContaining({ timeout: 15000 }),
+    );
+    // ffmpeg call includes tile filter
+    expect(vi.mocked(execFile)).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining("ffmpeg"),
+      expect.arrayContaining(["-frames:v", "1"]),
+      expect.objectContaining({ timeout: 60000 }),
+    );
+    expect(uploadFile).toHaveBeenCalledWith("u1/d1/sprite.jpg", expect.any(Buffer), { "Content-Type": "image/jpeg" });
+    expect(result).toBe("u1/d1/sprite.jpg");
+  });
+
+  it("calls ffprobe then ffmpeg for VIDEO_MOV", async () => {
+    const { execFile } = await import("child_process");
+    vi.mocked(execFile)
+      .mockResolvedValueOnce({
+        stdout: JSON.stringify({ format: { duration: "30.0" } }),
+        stderr: "",
+      } as any)
+      .mockResolvedValueOnce(undefined as any);
+
+    const result = await generateAndUploadSpriteSheet("/path/video.mov", MimeType.VIDEO_MOV, "u1", "d1");
+    expect(result).toBe("u1/d1/sprite.jpg");
+  });
+
+  it("never throws — returns null if ffprobe fails", async () => {
+    const { execFile } = await import("child_process");
+    vi.mocked(execFile).mockRejectedValueOnce(new Error("ffprobe not found"));
+    const result = await generateAndUploadSpriteSheet("/path/video.mp4", MimeType.VIDEO_MP4, "u1", "d1");
+    expect(result).toBeNull();
+  });
+
+  it("never throws — returns null if ffmpeg fails", async () => {
+    const { execFile } = await import("child_process");
+    vi.mocked(execFile)
+      .mockResolvedValueOnce({
+        stdout: JSON.stringify({ format: { duration: "60.0" } }),
+        stderr: "",
+      } as any)
+      .mockRejectedValueOnce(new Error("ffmpeg crash"));
+    const result = await generateAndUploadSpriteSheet("/path/video.mp4", MimeType.VIDEO_MP4, "u1", "d1");
+    expect(result).toBeNull();
+  });
+});
+
+describe("generateAndUploadSpriteSheetFromBuffer", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("returns null for non-video types", async () => {
+    const result = await generateAndUploadSpriteSheetFromBuffer(
+      Buffer.from("data"), MimeType.AUDIO_MP3, "u1", "d1"
+    );
+    expect(result).toBeNull();
+  });
+
+  it("writes temp file and delegates for VIDEO_MP4", async () => {
+    const { execFile } = await import("child_process");
+    vi.mocked(execFile)
+      .mockResolvedValueOnce({
+        stdout: JSON.stringify({ format: { duration: "60.0" } }),
+        stderr: "",
+      } as any)
+      .mockResolvedValueOnce(undefined as any);
+    const buf = Buffer.from("video-bytes");
+    const result = await generateAndUploadSpriteSheetFromBuffer(buf, MimeType.VIDEO_MP4, "u1", "d1");
+    expect(result).toBe("u1/d1/sprite.jpg");
+  });
+
+  it("writes temp file and delegates for VIDEO_WEBM", async () => {
+    const { execFile } = await import("child_process");
+    vi.mocked(execFile)
+      .mockResolvedValueOnce({
+        stdout: JSON.stringify({ format: { duration: "45.0" } }),
+        stderr: "",
+      } as any)
+      .mockResolvedValueOnce(undefined as any);
+    const buf = Buffer.from("webm-video-bytes");
+    const result = await generateAndUploadSpriteSheetFromBuffer(buf, MimeType.VIDEO_WEBM, "u1", "d1");
+    expect(result).toBe("u1/d1/sprite.jpg");
   });
 });

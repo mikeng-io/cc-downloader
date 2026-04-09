@@ -37,10 +37,12 @@ vi.mock("../minio", () => ({
   getObjectStream: mockGetObjectStream,
 }));
 
-// Mock generateAndUploadThumbnailFromBuffer
+// Mock generateAndUploadThumbnailFromBuffer and generateAndUploadSpriteSheetFromBuffer
 const mockGenerateThumbnail = vi.fn();
+const mockGenerateSprite = vi.fn();
 vi.mock("../thumbnail", () => ({
   generateAndUploadThumbnailFromBuffer: mockGenerateThumbnail,
+  generateAndUploadSpriteSheetFromBuffer: mockGenerateSprite,
 }));
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -149,6 +151,7 @@ describe("thumbnail worker processor", () => {
     const fakeBuffer = Buffer.from("video-bytes");
     mockGetObjectStream.mockResolvedValue(makeReadable(fakeBuffer));
     mockGenerateThumbnail.mockResolvedValue("user-1/dl-abc/thumbnail.jpg");
+    mockGenerateSprite.mockResolvedValue("user-1/dl-abc/sprite.jpg");
 
     await processor(makeJob());
 
@@ -161,16 +164,17 @@ describe("thumbnail worker processor", () => {
     );
     expect(mockUpdate).toHaveBeenCalledWith({
       where: { id: "dl-abc" },
-      data: { thumbnailPath: "user-1/dl-abc/thumbnail.jpg" },
+      data: { thumbnailPath: "user-1/dl-abc/thumbnail.jpg", spritePath: "user-1/dl-abc/sprite.jpg" },
     });
   });
 
-  it("does not update DB when generateAndUploadThumbnailFromBuffer returns null", async () => {
+  it("does not update DB when both thumbnail and sprite return null", async () => {
     const processor = getProcessor();
     mockFindUnique.mockResolvedValue({ thumbnailPath: null });
 
     mockGetObjectStream.mockResolvedValue(makeReadable(Buffer.from("audio-bytes")));
     mockGenerateThumbnail.mockResolvedValue(null);
+    mockGenerateSprite.mockResolvedValue(null);
 
     await processor(makeJob({ mimeType: "AUDIO_MP3" }));
 
